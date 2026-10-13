@@ -1,0 +1,1179 @@
+import "dotenv/config";
+import express from "express";
+import path from "path";
+import crypto from "crypto";
+import { GoogleGenAI } from "@google/genai";
+import { createServer as createViteServer } from "vite";
+import { serverDatabase } from "./server/db";
+import { emailService } from "./server/emailService";
+import { verificationService } from "./server/verificationService";
+
+const app = express();
+
+function parsePort(): number {
+  const portArgIndex = process.argv.indexOf("--port");
+  if (portArgIndex !== -1 && process.argv[portArgIndex + 1]) {
+    const val = parseInt(process.argv[portArgIndex + 1], 10);
+    if (!isNaN(val) && val > 0) return val;
+  }
+  if (process.env.PORT) {
+    const val = parseInt(process.env.PORT, 10);
+    if (!isNaN(val) && val > 0) return val;
+  }
+  return 3000;
+}
+
+const PORT = parsePort();
+
+app.use(express.json());
+
+// API Health Check
+app.get("/api/health", (req, res) => {
+  res.json({ status: "ok", timestamp: new Date().toISOString() });
+});
+
+// ==========================================
+// AUTHENTICATION & AUTHORIZATION MIDDLEWARE
+// ==========================================
+
+function extractToken(req: express.Request): string | null {
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    return authHeader.substring(7).trim();
+  }
+  const queryToken = req.query.token as string;
+  if (queryToken && typeof queryToken === "string") {
+    return queryToken.trim();
+  }
+  return null;
+}
+
+/**
+ * Middleware: Verify that incoming request has a valid active session token.
+ * Populates req.user, req.userRole, and req.sessionToken from the verified database user.
+ */
+function authenticateSession(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const token = extractToken(req);
+  if (!token) {
+    return res.status(401).json({
+      success: false,
+      error: "No autenticado. Se requiere token de sesión para acceder a este recurso.",
+    });
+  }
+
+  const sessionData = serverDatabase.getSession(token);
+  if (!sessionData) {
+    return res.status(401).json({
+      success: false,
+      error: "Sesión inválida o expirada. Por favor inicie sesión nuevamente.",
+    });
+  }
+
+  (req as any).user = sessionData.user;
+  (req as any).userRole = sessionData.user.role;
+  (req as any).sessionToken = token;
+  next();
+}
+
+/**
+ * Middleware: Require administrator privileges.
+ * Strictly verifies role against the server database record associated with the token.
+ * NEVER trusts client-supplied roles in headers or body!
+ */
+function requireAdmin(req: express.Request, res: express.Response, next: express.NextFunction) {
+  authenticateSession(req, res, () => {
+    const role = (req as any).userRole;
+    if (role !== "admin") {
+      return res.status(403).json({
+        success: false,
+        error: "Acceso denegado: Esta operación requiere permisos exclusivos de Administrador.",
+      });
+    }
+    next();
+  });
+}
+
+// ==========================================
+// 1. AUTHENTICATION ENDPOINTS
+// ==========================================
+
+// Register a new user
+// Note: Public registration only allows 'atleta' or 'entrenador'.
+// Creating an 'admin' account is strictly prohibited through public registration.
+app.post("/api/auth/register", (req, res) => {
+  try {
+    const {
+      id,
+      email,
+      password,
+      documentType,
+      documentNumber,
+      phone,
+      firstName,
+      lastName,
+      role,
+      trainerCode,
+      weight,
+      height,
+      clothingSize,
+      bodyType,
+    } = req.body;
+
+    if (!email || !email.trim()) {
+      return res.status(400).json({ success: false, error: "El correo electrónico es obligatorio." });
+    }
+    if (!password || password.length < 6) {
+      return res.status(400).json({ success: false, error: "La contraseña debe tener al menos 6 caracteres." });
+    }
+    if (!documentNumber || !documentNumber.trim()) {
+      return res.status(400).json({ success: false, error: "El número de documento / ID es obligatorio." });
+    }
+    if (!phone || !phone.trim()) {
+      return res.status(400).json({ success: false, error: "El número de teléfono es obligatorio." });
+    }
+
+    const weightNum = Number(weight) || 75;
+    const heightNum = Number(height) || 175;
+    const sizeVal = (clothingSize as any) || "M";
+
+    // Enforce role safety: public signup cannot grant 'admin'
+    const assignedRole = role === "entrenador" ? "entrenador" : "atleta";
+
+    const result = serverDatabase.registerUser({
+      id: id || undefined,
+      email,
+      password,
+      documentType: documentType || "Cédula de Ciudadanía (CC)",
+      documentNumber,
+      phone,
+      trainerCode: trainerCode || undefined,
+      firstName: firstName || "Atleta",
+      lastName: lastName || "Sportfitness",
+      role: assignedRole,
+      weight: weightNum,
+      height: heightNum,
+      clothingSize: sizeVal,
+      bodyType: bodyType || "Mesomorfo",
+    });
+
+    if (!result.success || !result.user) {
+      return res.status(400).json({ success: false, error: result.error || "No se pudo registrar el usuario." });
+    }
+
+    // If registered user is a trainer, dispatch their exclusive trainer identification number via email
+    if (assignedRole === "entrenador" && result.user.trainerCode) {
+      emailService
+        .sendTrainerCredentialEmail(result.user.email, result.user.fullName, result.user.trainerCode)
+        .catch((err) => console.error("Error sending trainer credential email:", err));
+    }
+
+    // Create session token and persist on server
+    const token = serverDatabase.createSession(result.user.id);
+
+    // Remove sensitive passwordHash and salt from response
+    const { passwordHash, salt, ...safeUser } = result.user;
+
+    return res.status(201).json({
+      success: true,
+      message:
+        assignedRole === "entrenador"
+          ? `Entrenador registrado con éxito. Se ha enviado tu Número de Identificación de Entrenador (${safeUser.trainerCode}) a tu correo electrónico.`
+          : "Usuario registrado con éxito. Progreso inicializado en 0.",
+      token,
+      user: safeUser,
+      role: safeUser.role,
+      trainerCode: safeUser.trainerCode,
+    });
+  } catch (err: any) {
+    console.error("Register Error:", err);
+    return res.status(500).json({ success: false, error: "Error en el servidor al registrar usuario." });
+  }
+});
+
+// Login endpoint
+app.post("/api/auth/login", (req, res) => {
+  try {
+    const { identifier, password, trainerCode } = req.body;
+
+    if (!identifier || !identifier.trim()) {
+      return res.status(400).json({
+        success: false,
+        error: "Ingresa tu correo electrónico o número de documento.",
+      });
+    }
+
+    if (!password) {
+      return res.status(400).json({
+        success: false,
+        error: "Ingresa tu contraseña.",
+      });
+    }
+
+    const result = serverDatabase.authenticateUser(identifier, password, trainerCode);
+
+    if (!result.success || !result.user) {
+      const err = result.error || "Usuario no registrado";
+
+      if (err === "Código de entrenador requerido") {
+        return res.status(400).json({
+          success: false,
+          error: "Código de entrenador requerido",
+          message:
+            "Para iniciar sesión como entrenador, es obligatorio ingresar tu Número de Identificación de Entrenador (Ej: ENT-XXXXX) asignado a tu correo.",
+        });
+      }
+
+      if (err === "Código de entrenador inválido") {
+        return res.status(401).json({
+          success: false,
+          error: "Código de entrenador inválido",
+          message:
+            "El Número de Identificación de Entrenador es incorrecto o no coincide con tu cuenta. Revisa tu correo de bienvenida o contacta a soporte.",
+        });
+      }
+
+      return res.status(401).json({
+        success: false,
+        error: err,
+        message:
+          err === "Usuario no registrado"
+            ? "Usuario no registrado. Este correo o documento no existe en la base de datos. Debes registrarte previamente para acceder."
+            : "Contraseña incorrecta. Por favor verifica tus credenciales.",
+      });
+    }
+
+    // Persist verified session on server
+    const token = serverDatabase.createSession(result.user.id);
+    const { passwordHash, salt, ...safeUser } = result.user;
+
+    return res.json({
+      success: true,
+      message: "Autenticación exitosa. Credenciales y permisos verificados en el servidor.",
+      token,
+      user: safeUser,
+      role: safeUser.role,
+      progress: safeUser.progress,
+      trainerCode: safeUser.trainerCode,
+    });
+  } catch (err: any) {
+    console.error("Login Error:", err);
+    return res.status(500).json({ success: false, error: "Error en el servidor al autenticar." });
+  }
+});
+
+// ==========================================
+// EMAIL VERIFICATION CODE ENDPOINTS
+// ==========================================
+
+// Send 6-digit verification code to email (for registration / verification)
+app.post("/api/auth/send-verification-code", async (req, res) => {
+  try {
+    const { email, purpose = "registro", code: customCode } = req.body || {};
+    if (!email || !email.trim()) {
+      return res.status(400).json({ success: false, error: "El correo electrónico es requerido." });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+
+    // If client supplied code to register
+    if (customCode && typeof customCode === "string" && customCode.trim().length === 6) {
+      verificationService.registerCode(cleanEmail, customCode.trim(), purpose);
+      // Dispatch via SendGrid as well without blocking HTTP response
+      emailService.sendVerificationEmail(cleanEmail, customCode.trim(), purpose).then((res) => {
+        console.log(`[SendGrid Direct] Verification email dispatched to ${cleanEmail}:`, res);
+      }).catch((e) =>
+        console.warn("[EmailService] Background verification dispatch note:", e?.message)
+      );
+      return res.json({
+        success: true,
+        code: customCode.trim(),
+        message: `Código registrado para ${cleanEmail}.`,
+      });
+    }
+
+    const result = await verificationService.generateAndSendCode(cleanEmail, purpose);
+    if (!result.success) {
+      return res.status(400).json(result);
+    }
+
+    return res.json({
+      success: true,
+      code: result.code,
+      message: `Código de verificación enviado exitosamente a ${cleanEmail}. Revisa tu bandeja de entrada o carpeta de spam.`,
+    });
+  } catch (error: any) {
+    console.error("send-verification-code error:", error);
+    return res.status(500).json({ success: false, error: "Error en el servidor al despachar el código." });
+  }
+});
+
+// General SendGrid email dispatch endpoint
+app.post("/api/send-email", async (req, res) => {
+  try {
+    const { to, subject, text, html, senderName } = req.body || {};
+    if (!to) {
+      return res.status(400).json({ success: false, error: "Destinatario 'to' requerido." });
+    }
+    const recipients = Array.isArray(to) ? to : [to];
+    const results = await Promise.all(
+      recipients.map((recipient: string) =>
+        emailService.sendViaSendGrid(
+          recipient,
+          subject || "Notificación de Sportfitness",
+          text || "",
+          html || `<p>${(text || "").replace(/\n/g, "<br/>")}</p>`
+        )
+      )
+    );
+    const hasSuccess = results.some((r) => r.success);
+    return res.json({
+      success: hasSuccess,
+      message: hasSuccess
+        ? "Correo enviado exitosamente mediante SendGrid."
+        : "No se pudo despachar el correo.",
+      results,
+    });
+  } catch (error: any) {
+    console.error("/api/send-email error:", error);
+    return res.status(500).json({ success: false, error: "Error en el servidor al despachar correo." });
+  }
+});
+
+// Dedicated trainer credential email dispatch endpoint
+app.post("/api/auth/trainer/send-credential", async (req, res) => {
+  try {
+    const { email, trainerName, trainerCode } = req.body || {};
+    if (!email || !email.trim()) {
+      return res.status(400).json({ success: false, error: "El correo electrónico es requerido." });
+    }
+    if (!trainerCode || !trainerCode.trim()) {
+      return res.status(400).json({ success: false, error: "El código de entrenador es requerido." });
+    }
+
+    const result = await emailService.sendTrainerCredentialEmail(
+      email.trim(),
+      trainerName || "Entrenador",
+      trainerCode.trim().toUpperCase()
+    );
+
+    return res.json({
+      success: true,
+      message: "Identificación de entrenador despachada al correo.",
+      result,
+    });
+  } catch (error: any) {
+    console.error("/api/auth/trainer/send-credential error:", error);
+    return res.status(500).json({ success: false, error: "Error en el servidor al enviar código de entrenador." });
+  }
+});
+
+// Verify 6-digit code
+app.post("/api/auth/verify-code", async (req, res) => {
+  try {
+    const { email, code } = req.body || {};
+    if (!email || !code) {
+      return res.status(400).json({ success: false, error: "Correo electrónico y código son obligatorios." });
+    }
+
+    const result = await verificationService.verifyCode(email, code);
+    if (!result.success) {
+      return res.status(400).json(result);
+    }
+
+    return res.json({
+      success: true,
+      message: result.message,
+      verificationToken: result.verificationToken,
+    });
+  } catch (error: any) {
+    console.error("verify-code error:", error);
+    return res.status(500).json({ success: false, error: "Error al validar el código." });
+  }
+});
+
+// Password Reset: Request code
+app.post("/api/auth/forgot-password/send-code", async (req, res) => {
+  try {
+    const { email, code: customCode } = req.body || {};
+    if (!email || !email.trim()) {
+      return res.status(400).json({ success: false, error: "Ingresa tu correo electrónico." });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+
+    // If client supplied code to register
+    if (customCode && typeof customCode === "string" && customCode.trim().length === 6) {
+      verificationService.registerCode(cleanEmail, customCode.trim(), "password_reset");
+      // Dispatch via SendGrid as well without blocking HTTP response
+      emailService.sendVerificationEmail(cleanEmail, customCode.trim(), "password_reset").then((res) => {
+        console.log(`[SendGrid Direct] Password reset email dispatched to ${cleanEmail}:`, res);
+      }).catch((e) =>
+        console.warn("[EmailService] Background password reset dispatch note:", e?.message)
+      );
+      return res.json({
+        success: true,
+        code: customCode.trim(),
+        message: `Código de recuperación registrado para ${cleanEmail}.`,
+      });
+    }
+
+    const result = await verificationService.generateAndSendCode(cleanEmail, "password_reset");
+    if (!result.success) {
+      return res.status(400).json(result);
+    }
+
+    return res.json({
+      success: true,
+      code: result.code,
+      message: `Código de recuperación enviado a ${cleanEmail}. Revisa tu bandeja de entrada o spam.`,
+    });
+  } catch (error: any) {
+    console.error("forgot-password send-code error:", error);
+    return res.status(500).json({ success: false, error: "Error al solicitar código de recuperación." });
+  }
+});
+
+// Endpoint for checking latest verification code in case of mail delivery delay or spam filtering
+app.get("/api/auth/verification-code-hint", (req, res) => {
+  const email = (req.query.email as string || "").trim().toLowerCase();
+  const code = verificationService.getLatestCode(email);
+  if (!code) {
+    return res.status(404).json({ success: false, error: "No hay código activo." });
+  }
+  return res.json({ success: true, code });
+});
+
+// Password Reset: Verify code
+app.post("/api/auth/forgot-password/verify-code", async (req, res) => {
+  try {
+    const { email, code } = req.body || {};
+    if (!email || !code) {
+      return res.status(400).json({ success: false, error: "Correo electrónico y código son obligatorios." });
+    }
+
+    const result = await verificationService.verifyCode(email, code);
+    if (!result.success) {
+      return res.status(400).json(result);
+    }
+
+    return res.json({
+      success: true,
+      message: result.message,
+      verificationToken: result.verificationToken,
+    });
+  } catch (error: any) {
+    console.error("forgot-password verify-code error:", error);
+    return res.status(500).json({ success: false, error: "Error al verificar código de recuperación." });
+  }
+});
+
+// Password Reset: Apply new password
+app.post("/api/auth/forgot-password/reset", (req, res) => {
+  try {
+    const { email, newPassword, verificationToken } = req.body || {};
+    if (!email || !newPassword || newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        error: "La nueva contraseña debe tener al menos 6 caracteres.",
+      });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+
+    if (verificationToken) {
+      const isValid = verificationService.consumeVerificationToken(verificationToken, cleanEmail);
+      if (!isValid) {
+        return res.status(403).json({
+          success: false,
+          error: "Token expirado o inválido",
+          message: "La sesión de verificación ha expirado. Por favor solicita un nuevo código.",
+        });
+      }
+    }
+
+    const user = serverDatabase.findUserByEmail(cleanEmail);
+    if (user) {
+      serverDatabase.adminResetPassword(user.id, newPassword);
+    }
+
+    return res.json({
+      success: true,
+      message: "Tu contraseña ha sido actualizada exitosamente. Ya puedes iniciar sesión.",
+    });
+  } catch (error: any) {
+    console.error("forgot-password reset error:", error);
+    return res.status(500).json({ success: false, error: "Error al actualizar la contraseña." });
+  }
+});
+
+// Contact Form Endpoint (Sends directly via SendGrid and triggers email)
+app.post("/api/contact", async (req, res) => {
+  try {
+    const { name, email, phone, subject, message } = req.body || {};
+    if (!name || !name.trim() || !email || !email.trim() || !message || !message.trim()) {
+      return res.status(400).json({
+        success: false,
+        error: "Por favor completa los campos obligatorios: nombre, correo y mensaje.",
+      });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const result = await emailService.sendContactEmail({
+      name: name.trim(),
+      email: cleanEmail,
+      phone: phone?.trim() || "",
+      subject: subject?.trim() || `Nuevo contacto de ${name.trim()}`,
+      message: message.trim(),
+    });
+
+    return res.json({
+      success: true,
+      message: "Tu mensaje ha sido enviado correctamente. Nos pondremos en contacto contigo pronto.",
+      messageId: result.messageId,
+    });
+  } catch (error: any) {
+    console.error("Contact API error:", error);
+    return res.status(500).json({
+      success: false,
+      error: "Ocurrió un error al procesar tu mensaje. Intenta nuevamente.",
+    });
+  }
+});
+
+// Google Sign-In endpoint
+app.post("/api/auth/google", (req, res) => {
+  try {
+    const { id, email, name, role, trainerCode, avatar } = req.body;
+    if (!email || !email.trim()) {
+      return res.status(400).json({ success: false, error: "El correo de Google es requerido." });
+    }
+
+    const result = serverDatabase.authenticateOrRegisterGoogleUser({
+      id: id?.trim(),
+      email: email.trim(),
+      name: name?.trim() || "Atleta Google",
+      role: role === "entrenador" ? "entrenador" : "atleta",
+      trainerCode: trainerCode?.trim(),
+      avatar,
+    });
+
+    const { passwordHash, salt, ...safeUser } = result.user;
+
+    return res.json({
+      success: true,
+      message: "Sesión iniciada correctamente con Google.",
+      token: result.token,
+      user: safeUser,
+      role: safeUser.role,
+      trainerCode: safeUser.trainerCode,
+      progress: safeUser.progress,
+    });
+  } catch (err: any) {
+    console.error("Google Auth Error:", err);
+    return res.status(500).json({ success: false, error: "Error en el servidor con Google Auth." });
+  }
+});
+
+// Verify current session
+app.get("/api/auth/verify-session", authenticateSession, (req, res) => {
+  const user = (req as any).user;
+  const { passwordHash, salt, ...safeUser } = user;
+  res.json({
+    success: true,
+    user: safeUser,
+    role: user.role,
+    progress: user.progress,
+  });
+});
+
+// Logout endpoint
+app.post("/api/auth/logout", (req, res) => {
+  const token = extractToken(req);
+  if (token) {
+    serverDatabase.revokeSession(token);
+  }
+  res.json({ success: true, message: "Sesión cerrada correctamente. Token revocado en el servidor." });
+});
+
+// ==========================================
+// 2. PROTECTED USER PROGRESS & PROFILE ENDPOINTS
+// ==========================================
+
+// Get user progress history (user themselves or admin)
+app.get("/api/user/:userId/progress", authenticateSession, (req, res) => {
+  const requestingUser = (req as any).user;
+  const { userId } = req.params;
+
+  if (requestingUser.role !== "admin" && requestingUser.id !== userId) {
+    return res.status(403).json({
+      success: false,
+      error: "Acceso denegado: No tienes autorización para consultar el progreso de otro usuario.",
+    });
+  }
+
+  const progress = serverDatabase.getUserProgress(userId);
+  if (!progress) {
+    return res.status(404).json({ success: false, error: "Usuario o registro de progreso no encontrado." });
+  }
+  return res.json({ success: true, progress });
+});
+
+// Record workout progress update
+app.post("/api/user/:userId/progress", authenticateSession, (req, res) => {
+  const requestingUser = (req as any).user;
+  const { userId } = req.params;
+
+  if (requestingUser.role !== "admin" && requestingUser.id !== userId) {
+    return res.status(403).json({
+      success: false,
+      error: "Acceso denegado: No puedes registrar entrenamientos para otra cuenta.",
+    });
+  }
+
+  const { exerciseName, durationMinutes, weightKg, tonnageRecordedKg, efficiencyScore } = req.body;
+
+  const result = serverDatabase.recordWorkoutProgress(userId, {
+    exerciseName: exerciseName || "Entrenamiento Funcional",
+    durationMinutes: Number(durationMinutes) || 30,
+    weightKg: Number(weightKg) || 75,
+    tonnageRecordedKg: Number(tonnageRecordedKg),
+    efficiencyScore: Number(efficiencyScore),
+  });
+
+  if (!result.success || !result.progress) {
+    return res.status(400).json({ success: false, error: result.error || "No se pudo registrar el progreso." });
+  }
+
+  return res.json({
+    success: true,
+    message: "Progreso actualizado y persistido permanentemente en la base de datos.",
+    progress: result.progress,
+  });
+});
+
+// Update health profile (weight, height, clothingSize)
+app.put("/api/user/:userId/health-profile", authenticateSession, (req, res) => {
+  const requestingUser = (req as any).user;
+  const { userId } = req.params;
+
+  if (requestingUser.role !== "admin" && requestingUser.id !== userId) {
+    return res.status(403).json({
+      success: false,
+      error: "Acceso denegado: No puedes modificar el perfil de salud de otro atleta.",
+    });
+  }
+
+  const { weight, height, clothingSize, bodyType } = req.body;
+
+  const result = serverDatabase.updateHealthProfile(userId, {
+    weight: Number(weight),
+    height: Number(height),
+    clothingSize: clothingSize as any,
+    bodyType,
+  });
+
+  if (!result.success || !result.healthProfile) {
+    return res.status(400).json({ success: false, error: result.error || "No se pudo actualizar el perfil de salud." });
+  }
+
+  return res.json({
+    success: true,
+    message: "Perfil antropométrico actualizado exitosamente.",
+    healthProfile: result.healthProfile,
+  });
+});
+
+// Get user full details (only owner or admin)
+app.get("/api/user/:userId", authenticateSession, (req, res) => {
+  const requestingUser = (req as any).user;
+  const { userId } = req.params;
+
+  if (requestingUser.role !== "admin" && requestingUser.id !== userId) {
+    return res.status(403).json({
+      success: false,
+      error: "Acceso denegado: Solo el titular de la cuenta o un administrador puede ver este perfil.",
+    });
+  }
+
+  const user = serverDatabase.findUserById(userId);
+  if (!user) {
+    return res.status(404).json({ success: false, error: "Usuario no encontrado." });
+  }
+  const { passwordHash, salt, ...safeUser } = user;
+  return res.json({ success: true, user: safeUser });
+});
+
+// Delete user account (only owner or admin)
+app.delete("/api/user/:userId", authenticateSession, (req, res) => {
+  const requestingUser = (req as any).user;
+  const { userId } = req.params;
+
+  if (requestingUser.role !== "admin" && requestingUser.id !== userId) {
+    return res.status(403).json({
+      success: false,
+      error: "Acceso denegado: No estás autorizado para eliminar esta cuenta.",
+    });
+  }
+
+  const result = serverDatabase.deleteUser(userId);
+  if (!result.success) {
+    return res.status(404).json(result);
+  }
+  return res.json(result);
+});
+
+app.post("/api/user/:userId/delete", authenticateSession, (req, res) => {
+  const requestingUser = (req as any).user;
+  const { userId } = req.params;
+
+  if (requestingUser.role !== "admin" && requestingUser.id !== userId) {
+    return res.status(403).json({
+      success: false,
+      error: "Acceso denegado: No estás autorizado para eliminar esta cuenta.",
+    });
+  }
+
+  const result = serverDatabase.deleteUser(userId);
+  if (!result.success) {
+    return res.status(404).json(result);
+  }
+  return res.json(result);
+});
+
+// Record outdoor GPS Route for user
+app.post("/api/user/:userId/gps-route", authenticateSession, (req, res) => {
+  const requestingUser = (req as any).user;
+  const { userId } = req.params;
+
+  if (requestingUser.role !== "admin" && requestingUser.id !== userId) {
+    return res.status(403).json({
+      success: false,
+      error: "Acceso denegado: No puedes registrar rutas GPS para otra cuenta.",
+    });
+  }
+
+  const { name, distanceKm, durationMinutes, avgPace, caloriesBurned } = req.body;
+  const result = serverDatabase.recordGpsRoute(userId, {
+    name: name || "Ruta GPS Outdoor",
+    distanceKm: Number(distanceKm) || 5.0,
+    durationMinutes: Number(durationMinutes) || 30,
+    avgPace: avgPace || "5:45 min/km",
+    caloriesBurned: Number(caloriesBurned),
+  });
+  if (!result.success) {
+    return res.status(400).json(result);
+  }
+  return res.json(result);
+});
+
+// ==========================================
+// USER NOTES & TRAINING JOURNAL ENDPOINTS
+// ==========================================
+
+// Get notes for user
+app.get("/api/user/:userId/notes", authenticateSession, (req, res) => {
+  const requestingUser = (req as any).user;
+  const { userId } = req.params;
+
+  if (requestingUser.role !== "admin" && requestingUser.id !== userId) {
+    return res.status(403).json({
+      success: false,
+      error: "Acceso denegado: No tienes permiso para ver las notas de otro atleta.",
+    });
+  }
+
+  const notes = serverDatabase.getUserNotes(userId);
+  return res.json({ success: true, notes });
+});
+
+// Add new note for user
+app.post("/api/user/:userId/notes", authenticateSession, (req, res) => {
+  const requestingUser = (req as any).user;
+  const { userId } = req.params;
+
+  if (requestingUser.role !== "admin" && requestingUser.id !== userId) {
+    return res.status(403).json({
+      success: false,
+      error: "Acceso denegado: No puedes crear notas para otra cuenta.",
+    });
+  }
+
+  const { title, content, category, pinned } = req.body;
+  if (!content || !content.trim()) {
+    return res.status(400).json({ success: false, error: "El contenido de la nota no puede estar vacío." });
+  }
+
+  const newNote = serverDatabase.addUserNote(userId, {
+    title: title || "Nota de Entrenamiento",
+    content: content.trim(),
+    category,
+    pinned,
+  });
+
+  if (!newNote) {
+    return res.status(404).json({ success: false, error: "No se encontró el usuario para agregar la nota." });
+  }
+
+  return res.status(201).json({
+    success: true,
+    message: "Nota persistida exitosamente en la base de datos.",
+    note: newNote,
+  });
+});
+
+// Update note
+app.put("/api/user/:userId/notes/:noteId", authenticateSession, (req, res) => {
+  const requestingUser = (req as any).user;
+  const { userId, noteId } = req.params;
+
+  if (requestingUser.role !== "admin" && requestingUser.id !== userId) {
+    return res.status(403).json({
+      success: false,
+      error: "Acceso denegado: No puedes modificar notas de otra cuenta.",
+    });
+  }
+
+  const updated = serverDatabase.updateUserNote(userId, noteId, req.body);
+  if (!updated) {
+    return res.status(404).json({ success: false, error: "Nota o usuario no encontrado." });
+  }
+
+  return res.json({
+    success: true,
+    message: "Nota actualizada en la base de datos.",
+    note: updated,
+  });
+});
+
+// Delete note
+app.delete("/api/user/:userId/notes/:noteId", authenticateSession, (req, res) => {
+  const requestingUser = (req as any).user;
+  const { userId, noteId } = req.params;
+
+  if (requestingUser.role !== "admin" && requestingUser.id !== userId) {
+    return res.status(403).json({
+      success: false,
+      error: "Acceso denegado: No puedes eliminar notas de otra cuenta.",
+    });
+  }
+
+  const deleted = serverDatabase.deleteUserNote(userId, noteId);
+  if (!deleted) {
+    return res.status(404).json({ success: false, error: "Nota o usuario no encontrado." });
+  }
+
+  return res.json({
+    success: true,
+    message: "Nota eliminada permanentemente de la base de datos.",
+  });
+});
+
+// ==========================================
+// 3. ADMINISTRATIVE DATABASE ENDPOINTS
+// (Strictly protected by requireAdmin middleware)
+// ==========================================
+
+// Get all database records (safe: passwords remain hashed and protected on server)
+app.get("/api/admin/database/records", requireAdmin, (req, res) => {
+  try {
+    const records = serverDatabase.getAllUsersForAdmin();
+    const metrics = serverDatabase.getAdminMetrics();
+    return res.json({
+      success: true,
+      records,
+      metrics,
+    });
+  } catch (error: any) {
+    console.error("Admin records error:", error);
+    return res.status(500).json({ success: false, error: "Error al obtener registros de base de datos." });
+  }
+});
+
+// Admin: Add a new user directly to database
+app.post("/api/admin/database/records", requireAdmin, (req, res) => {
+  try {
+    const result = serverDatabase.adminCreateUser(req.body);
+    if (!result.success) {
+      return res.status(400).json(result);
+    }
+    return res.status(201).json(result);
+  } catch (error: any) {
+    console.error("Admin create user error:", error);
+    return res.status(500).json({ success: false, error: "Error al crear usuario en base de datos." });
+  }
+});
+
+// Admin: Update user in database
+app.put("/api/admin/database/records/:userId", requireAdmin, (req, res) => {
+  try {
+    const { userId } = req.params;
+    const result = serverDatabase.adminUpdateUser(userId, req.body);
+    if (!result.success) {
+      return res.status(400).json(result);
+    }
+    return res.json(result);
+  } catch (error: any) {
+    console.error("Admin update user error:", error);
+    return res.status(500).json({ success: false, error: "Error al actualizar usuario." });
+  }
+});
+
+// Admin: Delete user from database
+app.delete("/api/admin/database/records/:userId", requireAdmin, (req, res) => {
+  try {
+    const { userId } = req.params;
+    const result = serverDatabase.deleteUser(userId);
+    if (!result.success) {
+      return res.status(404).json(result);
+    }
+    return res.json(result);
+  } catch (error: any) {
+    console.error("Admin delete user error:", error);
+    return res.status(500).json({ success: false, error: "Error al eliminar usuario." });
+  }
+});
+
+// Admin: Reset a user password securely
+app.post("/api/admin/database/records/:userId/reset-password", requireAdmin, (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { newPassword } = req.body;
+    if (!newPassword || newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        error: "La nueva contraseña debe tener al menos 6 caracteres.",
+      });
+    }
+    const result = serverDatabase.adminResetPassword(userId, newPassword);
+    if (!result.success) {
+      return res.status(400).json(result);
+    }
+    return res.json(result);
+  } catch (error: any) {
+    console.error("Admin reset password error:", error);
+    return res.status(500).json({ success: false, error: "Error al restablecer la contraseña." });
+  }
+});
+
+// Admin: Export entire database safely as JSON
+app.get("/api/admin/database/export", requireAdmin, (req, res) => {
+  try {
+    const records = serverDatabase.getAllUsersForAdmin();
+    const metrics = serverDatabase.getAdminMetrics();
+
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename=sportfitness_database_export_${Date.now()}.json`
+    );
+    res.setHeader("Content-Type", "application/json");
+
+    return res.json({
+      exportTimestamp: new Date().toISOString(),
+      authorizedByAdmin: (req as any).user.email,
+      metrics,
+      totalRecords: records.length,
+      records,
+    });
+  } catch (error: any) {
+    console.error("Admin export error:", error);
+    return res.status(500).json({ success: false, error: "Error al exportar base de datos." });
+  }
+});
+
+// Admin: Metrics overview
+app.get("/api/admin/metrics", requireAdmin, (req, res) => {
+  try {
+    const metrics = serverDatabase.getAdminMetrics();
+    return res.json({ success: true, metrics });
+  } catch (error: any) {
+    return res.status(500).json({ success: false, error: "Error al obtener métricas administrativas." });
+  }
+});
+
+// ==========================================
+// 4. SUPPORT TICKETING & COACH DESK ENDPOINTS
+// (Replaces the unused generic AI chatbot with a dedicated certified support desk)
+// ==========================================
+
+interface SupportTicket {
+  id: string;
+  athleteEmail: string;
+  athleteName: string;
+  category: string;
+  subject: string;
+  message: string;
+  urgency: "Normal" | "Alta" | "Urgente";
+  status: "Pendiente" | "En Revisión" | "Resuelto";
+  createdAt: string;
+  assignedCoach: string;
+}
+
+const activeSupportTickets: SupportTicket[] = [
+  {
+    id: "TCK-2026-101",
+    athleteEmail: "mateo.atleta@sportfitness.com",
+    athleteName: "Mateo Gómez",
+    category: "Metodología de Entrenamiento",
+    subject: "Ajuste de sobrecarga en sentadilla goblet por molestia de rodilla",
+    message: "Presento ligera molestia en tendón rotuliano al romper paralelo. Solicito variante biomecánica.",
+    urgency: "Alta",
+    status: "En Revisión",
+    createdAt: "2026-09-14T10:30:00.000Z",
+    assignedCoach: "Coach Carlos Martínez (Especialista en Biomecánica)",
+  },
+  {
+    id: "TCK-2026-102",
+    athleteEmail: "camila.ospina@sportfitness.com",
+    athleteName: "Camila Ospina",
+    category: "Nutrición & Suplementación",
+    subject: "Distribución de carbohidratos en semana de descarga competitiva",
+    message: "Tengo dudas sobre cómo reducir la carga glucídica sin perder masa magra.",
+    urgency: "Normal",
+    status: "Resuelto",
+    createdAt: "2026-09-12T14:15:00.000Z",
+    assignedCoach: "Nutricionista Valeria Duque",
+  },
+];
+
+app.get("/api/support/tickets", (req, res) => {
+  return res.json({ success: true, tickets: activeSupportTickets });
+});
+
+app.post("/api/support/tickets", (req, res) => {
+  const { athleteEmail, athleteName, category, subject, message, urgency } = req.body;
+
+  if (!athleteEmail || !subject || !message) {
+    return res.status(400).json({
+      success: false,
+      error: "Debes completar el correo, asunto y mensaje para enviar tu solicitud al equipo técnico.",
+    });
+  }
+
+  const newTicket: SupportTicket = {
+    id: `TCK-${Date.now().toString().slice(-6)}`,
+    athleteEmail: athleteEmail.trim(),
+    athleteName: athleteName?.trim() || "Atleta Sportfitness",
+    category: category || "Soporte General",
+    subject: subject.trim(),
+    message: message.trim(),
+    urgency: urgency || "Normal",
+    status: "Pendiente",
+    createdAt: new Date().toISOString(),
+    assignedCoach: "Equipo Técnico y Metodológico Sportfitness",
+  };
+
+  activeSupportTickets.unshift(newTicket);
+
+  return res.status(201).json({
+    success: true,
+    message: "Tu ticket de soporte ha sido radicado con éxito. Un entrenador o técnico responderá en menos de 2 horas.",
+    ticket: newTicket,
+  });
+});
+
+// ==========================================
+// 5. SERVER-SIDE GEMINI AI CHAT ENDPOINT
+// ==========================================
+app.post("/api/ai/chat", async (req, res) => {
+  try {
+    const { message, athleteContext, language = "es" } = req.body || {};
+
+    if (!message || typeof message !== "string") {
+      return res.status(400).json({ error: "El mensaje es obligatorio." });
+    }
+
+    const apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
+
+    if (!apiKey) {
+      return res.status(200).json({
+        reply:
+          "## ⚠️ Clave de Gemini API no configurada en el servidor\n\n" +
+          "Para activar el Asistente Técnico y Biomecánico con IA en tiempo real:\n" +
+          "1. Configura la variable `GEMINI_API_KEY` en tu entorno o archivo `.env`.\n" +
+          "2. Reinicia el servidor para aplicar los cambios.",
+        source: "offline-sports-engine",
+      });
+    }
+
+    const ai = new GoogleGenAI({ apiKey });
+
+    const langNameMap: Record<string, string> = {
+      es: "Español",
+      en: "English",
+      pt: "Português",
+      fr: "Français",
+      de: "Deutsch",
+      it: "Italiano",
+    };
+    const targetLangName = langNameMap[language] || "Español";
+
+    const systemInstruction = `Eres Sportfitness AI, el Asistente Técnico, Fisiólogo Deportivo, Biomecánico y Coach de Rendimiento de élite de la plataforma "Sportfitness Para Todos".
+Tu misión es resolver cualquier inquietud de atletas, entrenadores o usuarios sobre:
+1. Ciencias del Ejercicio (fisiología neuromuscular, biomecánica de levantamientos, periodización de fuerza e hipertrofia, resistencia aeróbica, RPE, TSB y recuperación).
+2. Nutrición Deportiva y Composición Corporal (macronutrientes, micronutrientes, hidratación, timing y suplementación basada en evidencia científica).
+3. Cultura Deportiva General e Historia (reglamentos olímpicos, hitos del atletismo, récords mundiales, disciplinas de combate, calistenia, halterofilia y deportes de equipo).
+4. Salud, Prevención de Lesiones y Ergonomía.
+
+REGLAS DE ORO OBLIGATORIAS:
+- NUNCA des respuestas superficiales, cortas o incompletas. Cada respuesta debe ser profunda, exhaustiva, científicamente fundamentada y con utilidad práctica inmediata.
+- Estructura SIEMPRE tus respuestas con formato Markdown pulcro: Títulos principales (##), subtítulos (###), listas ordenadas/desglosadas con viñetas, tablas cuando sea pertinente y recomendaciones concretas paso a paso.
+- Idioma de respuesta: Responde SIEMPRE en ${targetLangName} con terminología precisa y natural.
+- Contexto del atleta activo: ${JSON.stringify(athleteContext || {})}.`;
+
+    const modelName = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+    const prompt = `${message}\n\n[Idioma preferido del usuario: ${targetLangName}]\n[Datos del usuario: ${JSON.stringify(athleteContext || {})}]`;
+
+    const response = await ai.models.generateContent({
+      model: modelName,
+      contents: prompt,
+      config: {
+        systemInstruction,
+        temperature: 0.6,
+      },
+    });
+
+    const reply = response.text || "Respuesta procesada correctamente por Sportfitness AI.";
+    return res.status(200).json({ reply, source: `${modelName} (Server-Side Proxy)` });
+  } catch (error: any) {
+    console.error("Server-Side Gemini API Error:", error);
+    return res.status(500).json({
+      reply: "Ocurrió un error al procesar la solicitud con Gemini en el servidor. Por favor verifica tu clave API o cuota.",
+      error: error.message,
+    });
+  }
+});
+
+async function startServer() {
+  try {
+    if (process.env.NODE_ENV !== "production") {
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: "spa",
+      });
+      app.use(vite.middlewares);
+    } else {
+      const distPath = path.join(process.cwd(), "dist");
+      app.use(express.static(distPath));
+      app.get("*", (req, res) => {
+        res.sendFile(path.join(distPath, "index.html"));
+      });
+    }
+
+    const server = app.listen(PORT, "0.0.0.0", () => {
+      console.log(`Sportfitness Server running on http://0.0.0.0:${PORT}`);
+    });
+
+    server.on("error", (err: any) => {
+      console.error("Server listen error:", err);
+    });
+  } catch (err) {
+    console.error("Failed to start Sportfitness server:", err);
+    process.exit(1);
+  }
+}
+
+process.on("unhandledRejection", (reason) => {
+  console.warn("Unhandled Promise Rejection in server.ts:", reason);
+});
+
+startServer();

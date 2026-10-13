@@ -1,0 +1,160 @@
+{
+  "users": [
+    {
+      "id": "usr-admin-master",
+      "email": "admin@sportfitness.com",
+      "passwordHash": "8f01df527789257c56cf1f42cb0629663ac76fdbae5af83d8ff1bc147ec9516658ec7dfcb9cfe4d835536aba4677e455c59f05ebd8884ba9490f6a9c16e639ac",
+      "salt": "44b517c3471b1f080b607ff3542ecce9",
+      "documentType": "Cédula de Ciudadanía (CC)",
+      "documentNumber": "999000111",
+      "phone": "+57 300 000 0001",
+      "fullName": "Administrador General Sportfitness",
+      "firstName": "Admin",
+      "lastName": "General",
+      "role": "admin",
+      "membershipPlan": "Obsidian Ultimate (Admin)",
+      "createdAt": "2026-09-29T03:30:14.328Z",
+      "lastLoginAt": "2026-09-29T03:30:14.328Z",
+      "status": "Activo",
+      "healthProfile": {
+        "weight": 76,
+        "height": 178,
+        "clothingSize": "M",
+        "bodyType": "Mesomorfo",
+        "bmi": 24,
+        "bmiCategory": "Composición Atlética Óptima"
+      },
+      "progress": {
+        "userId": "usr-admin-master",
+        "sessionsCompleted": 0,
+        "weeklyVolumePercent": 0,
+        "totalVolumeKg": 0,
+        "streakDays": 0,
+        "streakDiscountPercent": 0,
+        "activeDaysTotal": 0,
+        "efficiencyScoreAvg": 0,
+        "lastUpdated": "2026-09-29T03:30:14.328Z",
+        "workoutLogs": [],
+        "milestones": [],
+        "gpsRoutes": []
+      }
+    },
+    {
+      "id": "jXXgvzRh1IY74rKUKjbCDxx9noz2",
+      "email": "joronimo.charris@gmail.com",
+      "passwordHash": "6a556a47133a7435a8dc93e74745e4284a93dd2c1ea03ee4d28e042a2a91955d1aba0fcc15b6538dba693733aa64681709c7b3398c306b2146bed5f8ed50b47a",
+      "salt": "8fe4e31af03445e3acd645dabadc2c60",
+      "documentType": "Tarjeta de Identidad (TI)",
+      "documentNumber": "1033188447",
+      "phone": "+57 3009921842",
+      "fullName": "jero charris",
+      "firstName": "jero",
+      "lastName": "charris",
+      "role": "atleta",
+      "membershipPlan": "Performance Pro",
+      "createdAt": "2026-10-12T23:42:02.887Z",
+      "lastLoginAt": "2026-10-12T23:56:02.457Z",
+      "healthProfile": {
+        "weight": 49,
+        "height": 165,
+        "clothingSize": "M",
+        "bodyType": "Ectomorfo",
+        "bmi": 18,
+        "bmiCategory": "Bajo peso"
+      },
+      "progress": {
+        "userId": "jXXgvzRh1IY74rKUKjbCDxx9noz2",
+        "sessionsCompleted": 0,
+        "weeklyVolumePercent": 0,
+        "totalVolumeKg": 0,
+        "streakDays": 0,
+        "streakDiscountPercent": 0,
+        "activeDaysTotal": 0,
+        "efficiencyScoreAvg": 0,
+        "lastUpdated": "2026-10-12T23:42:02.887Z",
+        "workoutLogs": [],
+        "gpsRoutes": [],
+        "milestones": [
+          {
+            "id": "ms-1791848522887",
+            "date": "2026-10-12",
+            "title": "Registro de Cuenta Creado",
+            "description": "Inicialización de progreso desde cero con perfil antropométrico vinculado."
+          }
+        ]
+      }
+    },
+    {
+      "id": "usr-g-1791849772626-145",
+      "email": "test.atleta@sportfitness.app",
+      "passwordHash": "a3b16bb90b5d5291357d04889cdec96b7342d13c9f3037d98e5d0dd762e0341d3fa52c9271bcea557efdaf4497189ed4ca8b77863e3dc5f8bee8a4cdad47b52b",
+      "salt": "2f546971bf9da0947a3e0cafdbc111aa",
+      "documentType": "Cédula de Ciudadanía (CC)",
+      "documentNumber": "G-23822173",
+      "phone": "+57 300 123 4567",
+      "fullName": "Atleta Prueba",
+      "firstName": "Atleta",
+      "lastName": "Prueba",
+      "role": "atleta",
+      "membershipPlan": "Performance Pro",
+      "createdAt": "2026-10-13T00:02:52.613Z",
+      "lastLoginAt": "2026-10-13T00:02:52.613Z",
+      "healthProfile": {
+        "weight": 74,
+        "height": 176,
+        "clothingSize": "M",
+        "bodyType": "Mesomorfo",
+        "bmi": 23.9,
+        "bmiCategory": "Composición Atlética Óptima"
+      },
+      "progress": {
+        "userId": "usr-g-1791849772626-145",
+        "sessionsCompleted": 0,
+        "weeklyVolumePercent": 0,
+        "totalVolumeKg": 0,
+        "streakDays": 0,
+        "streakDiscountPercent": 0,
+        "activeDaysTotal": 0,
+        "efficiencyScoreAvg": 0,
+        "lastUpdated": "2026-10-13T00:02:52.613Z",
+        "workoutLogs": [],
+        "gpsRoutes": [],
+        "milestones": [
+          {
+            "id": "ms-1791849772626",
+            "date": "2026-10-13",
+            "title": "Cuenta Creada con Google",
+            "description": "Acceso inmediato verificado con cuenta Google."
+          }
+        ]
+      },
+      "notes": [
+        {
+          "id": "note-welcome-1791849772627",
+          "userId": "usr-g-1791849772626-145",
+          "title": "Bienvenida a tu Diario de Notas",
+          "content": "Aquí puedes registrar tus sensaciones tras cada entrenamiento, tus marcas personales (1RM), reflexiones de nutrición y notas clave.",
+          "category": "General",
+          "date": "2026-10-13",
+          "pinned": true,
+          "createdAt": "2026-10-13T00:02:52.613Z",
+          "updatedAt": "2026-10-13T00:02:52.613Z"
+        }
+      ]
+    }
+  ],
+  "activeSessions": {
+    "c9ca586a8e0fed77d65a55993c4914bf7f85fb5b51683550acd225780f39e31b": {
+      "userId": "jXXgvzRh1IY74rKUKjbCDxx9noz2",
+      "createdAt": "2026-10-12T23:42:02.888Z"
+    },
+    "2105c19392708d8777be748e30fd74a058936c5b4934423e01fb484214aacd58": {
+      "userId": "jXXgvzRh1IY74rKUKjbCDxx9noz2",
+      "createdAt": "2026-10-12T23:56:02.458Z"
+    },
+    "27906898ff3995341c89d59c9c2d6763e78eb2e1eefba84cbe16baa108a18f4e": {
+      "userId": "usr-g-1791849772626-145",
+      "createdAt": "2026-10-13T00:02:52.627Z"
+    }
+  }
+}

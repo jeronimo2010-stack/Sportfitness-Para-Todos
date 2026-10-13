@@ -1,0 +1,8 @@
+{
+  "name": "Remix Remix Sportfitness Para Todos",
+  "description": "Plataforma web de alto rendimiento deportivo, análisis biomecánico, gestión de atletas y automatización de rutinas.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

@@ -1,0 +1,110 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile with role, contact info and trainer credentials",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 254 },
+        "name": { "type": "string", "maxLength": 120 },
+        "role": { "type": "string", "enum": ["atleta", "entrenador", "admin"] },
+        "documentType": { "type": "string", "maxLength": 80 },
+        "documentNumber": { "type": "string", "maxLength": 60 },
+        "phone": { "type": "string", "maxLength": 30 },
+        "trainerCode": { "type": "string", "maxLength": 30 },
+        "createdAt": { "type": "string", "maxLength": 40 },
+        "updatedAt": { "type": "string", "maxLength": 40 }
+      },
+      "required": ["id", "email", "name", "role", "documentNumber"]
+    },
+    "UserNote": {
+      "title": "UserNote",
+      "description": "Training and recovery journal note",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 160 },
+        "content": { "type": "string", "maxLength": 5000 },
+        "category": { "type": "string", "maxLength": 60 },
+        "date": { "type": "string", "maxLength": 40 }
+      },
+      "required": ["id", "userId", "title", "content"]
+    },
+    "WorkoutSession": {
+      "title": "WorkoutSession",
+      "description": "Logged workout session for tracking volume and progress",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "exerciseName": { "type": "string", "maxLength": 160 },
+        "durationMinutes": { "type": "number" },
+        "weightKg": { "type": "number" },
+        "efficiencyScore": { "type": "number" },
+        "completed": { "type": "boolean" },
+        "date": { "type": "string", "maxLength": 40 }
+      },
+      "required": ["id", "userId", "exerciseName"]
+    },
+    "SupportTicket": {
+      "title": "SupportTicket",
+      "description": "Technical support ticket for coach assistance",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "athleteEmail": { "type": "string", "maxLength": 254 },
+        "athleteName": { "type": "string", "maxLength": 120 },
+        "category": { "type": "string", "maxLength": 80 },
+        "subject": { "type": "string", "maxLength": 200 },
+        "message": { "type": "string", "maxLength": 4000 },
+        "urgency": { "type": "string", "enum": ["Normal", "Alta", "Urgente"] },
+        "status": { "type": "string", "enum": ["Pendiente", "En Revisión", "Resuelto"] },
+        "createdAt": { "type": "string", "maxLength": 40 }
+      },
+      "required": ["id", "athleteEmail", "subject", "message", "status"]
+    },
+    "CommunityVideo": {
+      "title": "CommunityVideo",
+      "description": "Short exercise video guides published by athletes and coaches with YouTube links and muscle tags",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "authorId": { "type": "string", "maxLength": 128 },
+        "authorName": { "type": "string", "maxLength": 120 },
+        "authorRole": { "type": "string", "enum": ["atleta", "entrenador", "admin"] },
+        "authorCustomAvatar": { "type": "string", "maxLength": 1000 },
+        "title": { "type": "string", "maxLength": 200 },
+        "youtubeUrl": { "type": "string", "maxLength": 500 },
+        "youtubeVideoId": { "type": "string", "maxLength": 50 },
+        "tag": { "type": "string", "maxLength": 60 },
+        "notes": { "type": "string", "maxLength": 2000 },
+        "createdAt": { "type": "string", "maxLength": 40 }
+      },
+      "required": ["id", "authorName", "title", "youtubeUrl", "youtubeVideoId", "tag"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profile collection containing athlete and trainer records"
+    },
+    "/users/{userId}/notes/{noteId}": {
+      "schema": "UserNote",
+      "description": "Private athlete notes subcollection"
+    },
+    "/users/{userId}/workouts/{workoutId}": {
+      "schema": "WorkoutSession",
+      "description": "Workout sessions history subcollection"
+    },
+    "/community_videos/{videoId}": {
+      "schema": "CommunityVideo",
+      "description": "Community short guide videos for exercises with YouTube links"
+    },
+    "/support_tickets/{ticketId}": {
+      "schema": "SupportTicket",
+      "description": "Support tickets for coach desk"
+    }
+  }
+}

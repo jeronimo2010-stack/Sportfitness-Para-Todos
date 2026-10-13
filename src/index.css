@@ -1,0 +1,158 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-serif: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-display: 'Barlow Condensed', 'Plus Jakarta Sans', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+@layer base {
+  :root {
+    --font-serif: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-display: 'Barlow Condensed', 'Plus Jakarta Sans', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+    --accent-neon: #56A867;
+    --accent-lime: #64B875;
+    --bg-deep: #0B0C10;
+    --bg-surface: #1E1E1E;
+    --bg-card: #18181A;
+  }
+
+  /* Standard typography sizing for crisp responsive fit across viewports */
+  html {
+    font-size: 16px;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  @media (min-width: 640px) {
+    html {
+      font-size: 16px;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    html {
+      font-size: 16px;
+    }
+  }
+
+  /* Accessibility Scaling Modes */
+  html[data-font-size="standard"] {
+    font-size: 16px;
+  }
+  @media (min-width: 1024px) {
+    html[data-font-size="standard"] {
+      font-size: 16.5px;
+    }
+  }
+
+  html[data-font-size="large"] {
+    font-size: 18px;
+  }
+  @media (min-width: 640px) {
+    html[data-font-size="large"] {
+      font-size: 18.5px;
+    }
+  }
+  @media (min-width: 1024px) {
+    html[data-font-size="large"] {
+      font-size: 19px;
+    }
+  }
+
+  html[data-font-size="xlarge"] {
+    font-size: 20px;
+  }
+  @media (min-width: 640px) {
+    html[data-font-size="xlarge"] {
+      font-size: 21px;
+    }
+  }
+  @media (min-width: 1024px) {
+    html[data-font-size="xlarge"] {
+      font-size: 22px;
+    }
+  }
+  
+  html {
+    scroll-behavior: smooth;
+  }
+
+  html, body, button, input, select, textarea {
+    font-family: var(--font-sans);
+  }
+
+  body {
+    background-color: #0B0C10;
+    color: #E6E6EC;
+    overflow-x: hidden;
+    line-height: 1.55;
+    letter-spacing: 0.01em;
+  }
+
+  h1, h2, h3, h4, h5, h6, .font-serif, .font-sans {
+    font-family: var(--font-sans) !important;
+    letter-spacing: -0.015em;
+  }
+
+  .font-display {
+    font-family: var(--font-display) !important;
+    letter-spacing: 0.02em;
+  }
+
+  .font-mono {
+    font-family: var(--font-mono) !important;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Floor scaling for small detail text so labels/badges remain crisp with glasses */
+[class*="text-[9px]"],
+[class*="text-[10px]"] {
+  font-size: 0.74rem !important;
+  line-height: 1.35;
+}
+
+[class*="text-[11px]"] {
+  font-size: 0.82rem !important;
+  line-height: 1.4;
+}
+
+/* Custom scrollbar for athletic dark UI */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #0B0C10;
+}
+::-webkit-scrollbar-thumb {
+  background: #27272a;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3f3f46;
+}
+
+.neon-glow {
+  box-shadow: 0 0 20px rgba(86, 168, 103, 0.18);
+}
+
+.neon-glow-sm {
+  box-shadow: 0 0 10px rgba(86, 168, 103, 0.15);
+}
+
+.neon-text-glow {
+  text-shadow: 0 0 12px rgba(86, 168, 103, 0.4);
+}
+

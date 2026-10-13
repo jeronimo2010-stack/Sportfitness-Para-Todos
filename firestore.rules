@@ -1,0 +1,82 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default-deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        request.auth.token.email in [
+          'mateobedoy20@gmail.com',
+          'velasquezfernanda1111@gmail.com',
+          'admin@sportfitness.com',
+          'sportfitness112@gmail.com'
+        ]
+      );
+    }
+
+    // User profiles
+    match /users/{userId} {
+      allow read: if true;
+      allow create: if isOwner(userId) && isValidId(userId);
+      allow update: if (isOwner(userId) || isAdmin()) && isValidId(userId);
+      allow delete: if isAdmin();
+
+      // Private User Notes
+      match /notes/{noteId} {
+        allow read, write: if (isOwner(userId) || isAdmin()) && isValidId(noteId);
+      }
+
+      // Private Workout Logs
+      match /workouts/{workoutId} {
+        allow read, write: if (isOwner(userId) || isAdmin()) && isValidId(workoutId);
+      }
+    }
+
+    // Short exercise video guides shared by community
+    match /community_videos/{videoId} {
+      allow read: if true;
+      allow create: if isSignedIn() && isValidId(videoId);
+      allow update, delete: if isSignedIn() && (resource.data.authorId == request.auth.uid || isAdmin());
+    }
+
+    // Support Tickets
+    match /support_tickets/{ticketId} {
+      allow get: if isSignedIn() && (resource.data.athleteEmail == request.auth.token.email || isAdmin());
+      allow list: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(ticketId);
+      allow update, delete: if isAdmin() && isValidId(ticketId);
+    }
+
+    // Mail collection for SendGrid / Firebase Trigger Email extension
+    match /mail/{mailId} {
+      allow create: if request.resource.data.to != null;
+      allow read: if isAdmin();
+      allow update, delete: if isAdmin();
+    }
+
+    // Admins Collection
+    match /admins/{adminId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+  }
+}
+
+
