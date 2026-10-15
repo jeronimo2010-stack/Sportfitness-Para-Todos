@@ -20,19 +20,20 @@ import {
 import { useApp } from '../../context/AppContext';
 import { localDatabase } from '../../db/localDatabase';
 import { authService } from '../../services/authService';
+import { SixDigitCodeInput } from './SixDigitCodeInput';
 
 export const ForgotPasswordModal: React.FC = () => {
   const { isForgotPasswordOpen, closeForgotPassword, t, theme, language, navigateTo, setUser, user } = useApp();
 
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [email, setEmail] = useState('');
-  const [pin, setPin] = useState(['', '', '', '', '', '']);
+  const [code, setCode] = useState('');
   const [verificationToken, setVerificationToken] = useState<string | null>(null);
   const [codeNotification, setCodeNotification] = useState<string | null>(null);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [timer, setTimer] = useState(45);
+  const [timer, setTimer] = useState(60);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -40,7 +41,7 @@ export const ForgotPasswordModal: React.FC = () => {
     if (isForgotPasswordOpen) {
       setStep(1);
       setEmail('');
-      setPin(['', '', '', '', '', '']);
+      setCode('');
       setVerificationToken(null);
       setCodeNotification(null);
       setNewPassword('');
@@ -63,7 +64,8 @@ export const ForgotPasswordModal: React.FC = () => {
 
   const handleStep1Submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim() || !email.includes('@')) {
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail || !cleanEmail.includes('@')) {
       setError(language === 'en' ? 'Please enter a valid email address' : 'Ingresa un correo electrónico válido');
       return;
     }
@@ -71,18 +73,21 @@ export const ForgotPasswordModal: React.FC = () => {
     setIsLoading(true);
 
     try {
-      await authService.sendForgotPasswordCode(email.trim());
+      const res = await authService.sendForgotPasswordCode(cleanEmail);
+      if (!res.success) {
+        setError(res.message || res.error || (language === 'en' ? 'User not found or code delivery failed' : 'Usuario no registrado o error en el envío'));
+        return;
+      }
       setCodeNotification(
         language === 'en'
-          ? `✉️ 6-digit recovery code sent to ${email.trim()}. Please check your inbox or spam folder.`
-          : `✉️ Hemos enviado un código de recuperación de 6 dígitos a ${email.trim()}. Revisa tu bandeja de entrada o spam.`
+          ? `✉️ 6-digit recovery code sent to ${cleanEmail}. Valid for 10 minutes. Please check your inbox or spam folder.`
+          : `✉️ Hemos enviado un código de recuperación de 6 dígitos a ${cleanEmail}. Válido por 10 minutos. Revisa tu bandeja de entrada o spam.`
       );
       setStep(2);
-      setTimer(45);
-      setPin(['', '', '', '', '', '']);
+      setTimer(60);
+      setCode('');
     } catch (err: any) {
       setError(err.message || 'Error al conectar con el servidor.');
-      setStep(2);
     } finally {
       setIsLoading(false);
     }
@@ -91,16 +96,16 @@ export const ForgotPasswordModal: React.FC = () => {
   const handleResendCode = async () => {
     setError('');
     setIsLoading(true);
-    setPin(['', '', '', '', '', '']);
+    setCode('');
     try {
       const res = await authService.sendForgotPasswordCode(email.trim());
       if (res.success) {
         setCodeNotification(
           language === 'en'
-            ? `✉️ New 6-digit recovery code sent to ${email.trim()}. Check your email.`
-            : `✉️ Nuevo código de 6 dígitos enviado a ${email.trim()}. Revisa tu correo.`
+            ? `✉️ New 6-digit recovery code sent to ${email.trim()}. Valid for 10 minutes.`
+            : `✉️ Nuevo código de 6 dígitos enviado a ${email.trim()}. Válido por 10 minutos.`
         );
-        setTimer(45);
+        setTimer(60);
       } else {
         setError(res.message || 'No se pudo reenviar el código.');
       }
@@ -111,23 +116,9 @@ export const ForgotPasswordModal: React.FC = () => {
     }
   };
 
-  const handlePinChange = (index: number, val: string) => {
-    if (val.length > 1) val = val.slice(-1);
-    const newPin = [...pin];
-    newPin[index] = val;
-    setPin(newPin);
-
-    // Auto-focus next input
-    if (val && index < 5) {
-      const nextInput = document.getElementById(`pin-input-${index + 1}`);
-      if (nextInput) nextInput.focus();
-    }
-  };
-
-  const handleStep2Submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const fullPin = pin.join('');
-    if (fullPin.length !== 6) {
+  const handleStep2Submit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (code.length !== 6) {
       setError(language === 'en' ? 'Please enter the 6 verification digits' : 'Por favor ingresa los 6 dígitos de verificación');
       return;
     }
@@ -135,7 +126,7 @@ export const ForgotPasswordModal: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const res = await authService.verifyForgotPasswordCode(email.trim(), fullPin);
+      const res = await authService.verifyForgotPasswordCode(email.trim(), code);
       if (res.success) {
         setVerificationToken(res.verificationToken || null);
         setStep(3);
@@ -376,23 +367,15 @@ export const ForgotPasswordModal: React.FC = () => {
               </p>
 
               {/* 6 Digit Box Inputs */}
-              <div className="flex items-center justify-center gap-2 sm:gap-3 py-3">
-                {[0, 1, 2, 3, 4, 5].map((idx) => (
-                  <input
-                    key={idx}
-                    id={`pin-input-${idx}`}
-                    type="text"
-                    maxLength={1}
-                    value={pin[idx] || ''}
-                    onChange={(e) => handlePinChange(idx, e.target.value)}
-                    className={`w-11 h-12 text-center text-lg font-mono font-bold rounded-xl focus:outline-none transition-all ${
-                      isDark
-                        ? 'bg-[#181824] border border-[#2D2D3E] text-[#56A867] focus:border-[#56A867]'
-                        : 'bg-slate-50 border border-slate-300 text-emerald-700 focus:border-emerald-600'
-                    }`}
-                  />
-                ))}
-              </div>
+              <SixDigitCodeInput
+                value={code}
+                onChange={setCode}
+                onComplete={(completedCode) => {
+                  setCode(completedCode);
+                }}
+                disabled={isLoading}
+                isDark={isDark}
+              />
 
               {/* Timer and Resend option */}
               <div className="flex flex-col sm:flex-row items-center justify-between gap-2 text-xs pt-1">

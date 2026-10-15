@@ -136,7 +136,7 @@ Has solicitado un código de verificación para ${purposeText} en Sportfitness.
 
 Tu código de verificación de 6 dígitos es: ${code}
 
-Este código es de uso único y expirará en exactamente 5 minutos.
+Este código es de uso único y expirará en exactamente 10 minutos.
 Si tú no realizaste esta solicitud, puedes ignorar este mensaje con total tranquilidad.
 
 Equipo de Seguridad Sportfitness
@@ -183,7 +183,7 @@ Equipo de Seguridad Sportfitness
                   ${code}
                 </div>
                 <div style="font-size: 12px; color: #a0a0b0; margin-top: 8px;">
-                  ⏱️ Válido durante <strong>5 minutos</strong>
+                  ⏱️ Válido durante <strong>10 minutos</strong>
                 </div>
               </div>
             </td>

@@ -71,8 +71,8 @@ class VerificationService {
     }
     this.usedCodesHistory.set(cleanEmail, history);
 
-    // 3. Expiration time: exactly 5 minutes (300,000 ms)
-    const EXPIRATION_MS = 5 * 60 * 1000;
+    // 3. Expiration time: exactly 10 minutes (600,000 ms)
+    const EXPIRATION_MS = 10 * 60 * 1000;
     const now = Date.now();
     const expiresAt = now + EXPIRATION_MS;
 
@@ -116,7 +116,7 @@ class VerificationService {
       success: true,
       code: numericCode,
       message: `Código de verificación de 6 dígitos enviado exitosamente a ${cleanEmail}. Revisa tu bandeja de entrada o carpeta de spam.`,
-      expiresInSeconds: 300,
+      expiresInSeconds: 600,
     };
   }
 

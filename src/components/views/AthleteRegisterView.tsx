@@ -37,6 +37,7 @@ import { localDatabase } from '../../db/localDatabase';
 import { authService } from '../../services/authService';
 import { ScrollReveal } from '../common/ScrollReveal';
 import { GoogleSignInButton } from '../common/GoogleSignInButton';
+import { SixDigitCodeInput } from '../common/SixDigitCodeInput';
 import {
   BodyType,
   ClothingSize,
@@ -139,6 +140,18 @@ export const AthleteRegisterView: React.FC<AthleteRegisterViewProps> = ({
   const [inputCode, setInputCode] = useState('');
   const [emailVerified, setEmailVerified] = useState(false);
   const [codeNotification, setCodeNotification] = useState<string | null>(null);
+  const [resendTimer, setResendTimer] = useState(60);
+
+  // Verification resend countdown timer
+  useEffect(() => {
+    let interval: any = null;
+    if (isVerifyingEmail && resendTimer > 0) {
+      interval = setInterval(() => {
+        setResendTimer((prev) => prev - 1);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [isVerifyingEmail, resendTimer]);
 
   const [selectedCountry, setSelectedCountry] = useState(COUNTRIES[0]);
   const [phone, setPhone] = useState('');
@@ -918,21 +931,15 @@ export const AthleteRegisterView: React.FC<AthleteRegisterViewProps> = ({
               <div className="space-y-2 text-center py-2">
                 <label className={`text-xs font-mono block ${isDark ? 'text-[#B0B0C0]' : 'text-slate-700'}`}>
                   {language === 'en'
-                    ? 'Enter the 6-digit numeric code received:'
-                    : 'Ingresa los 6 dígitos numéricos recibidos:'}
+                    ? 'Enter the 6-digit numeric code received (valid 10 minutes):'
+                    : 'Ingresa los 6 dígitos numéricos recibidos (válido 10 minutos):'}
                 </label>
-                <input
-                  type="text"
-                  maxLength={6}
-                  required
+                <SixDigitCodeInput
                   value={inputCode}
-                  onChange={(e) => setInputCode(e.target.value.replace(/\D/g, ''))}
-                  placeholder=""
-                  className={`w-48 mx-auto text-center font-mono text-2xl tracking-[0.4em] py-3 rounded-xl border focus:outline-none ${
-                    isDark
-                      ? 'bg-[#131318] border-[#2E2E40] text-[#56A867] focus:border-[#56A867]'
-                      : 'bg-white border-slate-300 text-slate-900 focus:border-emerald-600'
-                  }`}
+                  onChange={setInputCode}
+                  onComplete={(c) => setInputCode(c)}
+                  disabled={isSendingCode}
+                  isDark={isDark}
                 />
               </div>
 
@@ -941,7 +948,7 @@ export const AthleteRegisterView: React.FC<AthleteRegisterViewProps> = ({
                 <button
                   type="submit"
                   disabled={isSendingCode || inputCode.length !== 6}
-                  className={`w-full py-3 px-6 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed ${
+                  className={`w-full py-3 px-6 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer ${
                     isDark
                       ? 'bg-[#56A867] hover:bg-[#64B875] text-black shadow-[0_0_20px_rgba(86,168,103,0.25)]'
                       : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-md'
@@ -955,33 +962,66 @@ export const AthleteRegisterView: React.FC<AthleteRegisterViewProps> = ({
                   </span>
                 </button>
 
+                {/* Resend and Timer */}
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-2 pt-2 text-xs font-mono">
+                  <span className={isDark ? 'text-neutral-400' : 'text-slate-500'}>
+                    {resendTimer > 0 ? (
+                      `⏱️ ${language === 'en' ? 'Resend in' : 'Reenviar código en'} ${resendTimer}s`
+                    ) : (
+                      <span className="text-[#56A867] font-semibold">{language === 'en' ? 'Code expired / Ready to resend' : 'Puedes reenviar el código'}</span>
+                    )}
+                  </span>
+
                   <button
                     type="button"
-                    onClick={handleSendVerificationCode}
+                    disabled={resendTimer > 0 || isSendingCode}
+                    onClick={() => {
+                      handleSendVerificationCode();
+                      setResendTimer(60);
+                    }}
                     className={`hover:underline flex items-center gap-1 ${
-                      isDark ? 'text-amber-400' : 'text-amber-600'
+                      resendTimer === 0 && !isSendingCode
+                        ? isDark ? 'text-[#56A867] cursor-pointer' : 'text-emerald-600 cursor-pointer'
+                        : 'text-neutral-500 cursor-not-allowed opacity-60'
                     }`}
                   >
                     <RotateCcw className="w-3.5 h-3.5" />
                     <span>
-                      {language === 'en'
-                        ? "Didn't receive any code? Resend"
-                        : '¿No recibiste ningún código? Reenviar'}
+                      {language === 'en' ? 'Resend Code' : 'Reenviar Código'}
                     </span>
                   </button>
+                </div>
 
+                {/* Alternate Actions */}
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-2 pt-2 text-xs font-mono border-t border-neutral-800/40">
                   <button
                     type="button"
                     onClick={handleChangeEmail}
-                    className={`hover:underline flex items-center gap-1 ${
-                      isDark ? 'text-[#56A867]' : 'text-emerald-600'
+                    className={`hover:underline flex items-center gap-1 cursor-pointer ${
+                      isDark ? 'text-neutral-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
                     <span>
                       {language === 'en'
                         ? 'Change email address'
                         : 'Cambiar correo por uno diferente'}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsVerifyingEmail(false);
+                      changeStep(2);
+                    }}
+                    className={`hover:underline flex items-center gap-1 cursor-pointer font-bold ${
+                      isDark ? 'text-[#56A867]' : 'text-emerald-700'
+                    }`}
+                  >
+                    <span>
+                      {language === 'en'
+                        ? 'Skip for now & Continue to Biometrics →'
+                        : 'Omitir por ahora y continuar a Biometría →'}
                     </span>
                   </button>
                 </div>

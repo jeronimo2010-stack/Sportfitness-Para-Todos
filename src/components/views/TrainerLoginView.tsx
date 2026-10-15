@@ -19,6 +19,7 @@ import {
   IdCard,
   Award,
   ShieldCheck,
+  KeyRound,
 } from 'lucide-react';
 import { ScreenId, UserProfile } from '../../types';
 import { EmblemLogo } from '../common/EmblemLogo';
@@ -26,6 +27,7 @@ import { useApp } from '../../context/AppContext';
 import { authService } from '../../services/authService';
 import { localDatabase } from '../../db/localDatabase';
 import { ScrollReveal } from '../common/ScrollReveal';
+import { EmailVerificationModal } from '../common/EmailVerificationModal';
 
 interface TrainerLoginViewProps {
   onNavigate: (screen: ScreenId) => void;
@@ -46,6 +48,7 @@ export const TrainerLoginView: React.FC<TrainerLoginViewProps> = ({
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isCodeLoginOpen, setIsCodeLoginOpen] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -486,6 +489,20 @@ export const TrainerLoginView: React.FC<TrainerLoginViewProps> = ({
               <span>{loading ? (language === 'en' ? 'Verifying Coach Database...' : 'Verificando en Base de Datos...') : (language === 'en' ? 'Sign In as Coach' : 'Entrar como Entrenador')}</span>
               <ArrowRight className="w-4 h-4" />
             </button>
+
+            {/* Login with 6-digit email verification code */}
+            <button
+              type="button"
+              onClick={() => setIsCodeLoginOpen(true)}
+              className={`w-full py-2.5 px-4 rounded-xl font-mono text-xs font-semibold transition-all flex items-center justify-center gap-2 border cursor-pointer mt-2 ${
+                isDark
+                  ? 'border-[#2D2D3E] text-neutral-300 hover:border-cyan-400 hover:text-cyan-400 bg-[#14141C]'
+                  : 'border-slate-300 text-slate-700 hover:border-blue-600 hover:text-blue-700 bg-white shadow-sm'
+              }`}
+            >
+              <KeyRound className="w-3.5 h-3.5" />
+              <span>{language === 'en' ? 'Or login with 6-digit email code' : 'O acceder con código de 6 dígitos al correo'}</span>
+            </button>
           </form>
 
           {/* Redirect to trainer register */}
@@ -514,6 +531,22 @@ export const TrainerLoginView: React.FC<TrainerLoginViewProps> = ({
           </p>
         </div>
       </div>
+
+      {/* 6-Digit Email Code Login Modal */}
+      <EmailVerificationModal
+        isOpen={isCodeLoginOpen}
+        onClose={() => setIsCodeLoginOpen(false)}
+        email={trainerId.includes('@') ? trainerId.trim() : ''}
+        purpose="login"
+        onSuccess={(verifiedEmail) => {
+          setIsCodeLoginOpen(false);
+          const user = localDatabase.findUserByEmail(verifiedEmail);
+          if (user) {
+            onLoginSuccess(user);
+            onNavigate('trainer-overview');
+          }
+        }}
+      />
     </div>
   );
 };
