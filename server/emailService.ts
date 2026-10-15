@@ -12,7 +12,7 @@ class EmailService {
   private transporter: Transporter | null = null;
   private isConfigured: boolean = false;
   private readonly sendGridApiKey: string =
-    process.env.SENDGRID_API_KEY || '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';
+    process.env.SENDGRID_API_KEY || '';
   private readonly sendGridFromEmail: string =
     process.env.SENDGRID_FROM_EMAIL || 'sportfitness112@gmail.com';
   private readonly sendGridFromName: string =
