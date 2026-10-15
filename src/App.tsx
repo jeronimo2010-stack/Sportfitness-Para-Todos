@@ -90,6 +90,14 @@ function MainAppContent() {
     }
 
     localDatabase.setActiveUserId(resolvedUser.id);
+    localDatabase.saveUser(resolvedUser);
+    try {
+      if (!localStorage.getItem('sportfitness_session_token')) {
+        const token = `sf_session_${resolvedUser.id}_${Date.now()}`;
+        localStorage.setItem('sportfitness_session_token', token);
+        sessionStorage.setItem('sportfitness_session_token', token);
+      }
+    } catch {}
     setUser(resolvedUser);
 
     if (role === 'atleta') {

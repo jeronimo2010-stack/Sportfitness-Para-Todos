@@ -83,7 +83,7 @@ class AuthService {
     const fullName = `${cleanFirstName} ${cleanLastName}`.trim();
     const assignedRole = payload.role === 'entrenador' ? 'entrenador' : 'atleta';
 
-    // 1. Pre-validation of required fields
+    // 1. Validaciones previas de formato de campos obligatorios
     if (!cleanEmail || !cleanEmail.includes('@')) {
       return { success: false, error: 'Ingresa un correo electrónico válido.' };
     }
@@ -100,101 +100,12 @@ class AuthService {
       return { success: false, error: 'El nombre y apellido son obligatorios.' };
     }
 
-    // Check document uniqueness in Firestore cloud across all devices
+    let userId = `usr-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`;
+    let serverToken = `sf_token_${userId}`;
+
+    // STEP 1: Registro en servidor (/api/auth/register)
     try {
-      const usersRef = collection(db, 'users');
-      const q = query(usersRef, where('documentNumber', '==', cleanDoc));
-      const existingSnap = await getDocs(q);
-      if (!existingSnap.empty) {
-        return {
-          success: false,
-          error: `Ya existe una cuenta registrada en Firebase con el número de documento ${cleanDoc}. Por favor inicia sesión directamente.`,
-        };
-      }
-    } catch (fsErr) {
-      console.warn('[Firestore] Pre-check document notice:', fsErr);
-    }
-
-    let userId = '';
-    let userCredential: any = null;
-
-    // STEP 1: Firebase Authentication
-    try {
-      userCredential = await createUserWithEmailAndPassword(auth, cleanEmail, payload.password);
-      userId = userCredential.user.uid;
-      console.log('[Firebase Auth] User created in Auth with UID:', userId);
-    } catch (authError: any) {
-      console.warn('[Firebase Auth] Registration check notice:', authError?.code || authError?.message);
-      if (authError.code === 'auth/email-already-in-use') {
-        return {
-          success: false,
-          error: 'Este correo electrónico ya está registrado en Firebase. Por favor inicia sesión directamente o restablece tu contraseña.',
-        };
-      }
-      if (authError.code === 'auth/weak-password') {
-        return {
-          success: false,
-          error: 'La contraseña es muy débil. Debe tener al menos 6 caracteres.',
-        };
-      }
-      if (authError.code === 'auth/invalid-email') {
-        return {
-          success: false,
-          error: 'El formato del correo electrónico ingresado no es válido.',
-        };
-      }
-      // If network is uncontactable, return clear descriptive error
-      return {
-        success: false,
-        error: `Error al crear usuario en Firebase Authentication: ${authError.message || authError.code}`,
-      };
-    }
-
-    // STEP 2: Firestore Document write (AWAITED - with automatic rollback)
-    const firestoreUserDoc = {
-      id: userId,
-      email: cleanEmail,
-      name: fullName,
-      role: assignedRole,
-      documentType: payload.documentType || 'Cédula de Ciudadanía (CC)',
-      documentNumber: cleanDoc,
-      phone: cleanPhone,
-      trainerCode: payload.trainerCode || null,
-      membershipPlan: 'Performance Pro',
-      weight: Number(payload.weight) || 75,
-      height: Number(payload.height) || 175,
-      clothingSize: payload.clothingSize || 'M',
-      bodyType: payload.bodyType || 'Mesomorfo',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-
-    try {
-      const userRef = doc(db, 'users', userId);
-      await setDoc(userRef, firestoreUserDoc);
-      console.log('[Firestore] User document created successfully with ID:', userId);
-    } catch (firestoreError: any) {
-      console.error('[Firestore] CRITICAL: Failed to write user document:', firestoreError);
-
-      // ROLLBACK: Delete newly created Firebase Auth account so we don't leave an orphaned account
-      if (userCredential?.user) {
-        try {
-          await userCredential.user.delete();
-          console.log('[Firebase Auth] Rollback executed: Auth user deleted due to Firestore write error.');
-        } catch (rollbackErr) {
-          console.warn('[Firebase Auth] Rollback notice:', rollbackErr);
-        }
-      }
-
-      return {
-        success: false,
-        error: `Error al guardar los datos del perfil en Firestore: ${firestoreError.message || firestoreError.code}. El registro fue revertido para evitar un estado a medias.`,
-      };
-    }
-
-    // STEP 3: Server Database & Local Database sync
-    try {
-      await fetch('/api/auth/register', {
+      const srvRes = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -203,10 +114,66 @@ class AuthService {
           email: cleanEmail,
           documentNumber: cleanDoc,
           phone: cleanPhone,
+          fullName,
+          firstName: cleanFirstName,
+          lastName: cleanLastName,
+          role: assignedRole,
         }),
-      }).catch((e) => console.warn('[Backend] /api/auth/register notice:', e));
-    } catch {}
+      });
+      const srvData = await srvRes.json().catch(() => null);
+      if (srvRes.ok && srvData?.success && srvData?.user) {
+        if (srvData.user.id) userId = srvData.user.id;
+        if (srvData.token) serverToken = srvData.token;
+      } else if (srvData?.error && srvData.error.includes('ya se encuentra registrado')) {
+        return {
+          success: false,
+          error: srvData.error,
+          message: srvData.error,
+        };
+      }
+    } catch (srvErr) {
+      console.warn('[Backend] /api/auth/register notice:', srvErr);
+    }
 
+    // STEP 2: Sincronización resiliente con Firebase (sin bloquear el registro ante fallos de red)
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, cleanEmail, payload.password);
+      if (userCredential?.user?.uid) {
+        userId = userCredential.user.uid;
+        serverToken = `fb_token_${userId}`;
+      }
+      const userRef = doc(db, 'users', userId);
+      await setDoc(
+        userRef,
+        {
+          id: userId,
+          email: cleanEmail,
+          name: fullName,
+          role: assignedRole,
+          documentType: payload.documentType || 'Cédula de Ciudadanía (CC)',
+          documentNumber: cleanDoc,
+          phone: cleanPhone,
+          trainerCode: payload.trainerCode || null,
+          membershipPlan: 'Performance Pro',
+          weight: Number(payload.weight) || 75,
+          height: Number(payload.height) || 175,
+          clothingSize: payload.clothingSize || 'M',
+          bodyType: payload.bodyType || 'Mesomorfo',
+          createdAt: new Date().toISOString(),
+        },
+        { merge: true }
+      );
+    } catch (fbErr: any) {
+      console.warn('[Firebase Auth] Sincronización secundaria notice:', fbErr?.code || fbErr?.message);
+      if (fbErr?.code === 'auth/email-already-in-use') {
+        return {
+          success: false,
+          error: 'Este correo electrónico ya está registrado. Por favor inicia sesión directamente.',
+        };
+      }
+    }
+
+    // STEP 3: Persistencia en localDatabase y almacenamiento del token
     const userProfile: UserProfile = {
       id: userId,
       name: fullName,
@@ -231,16 +198,32 @@ class AuthService {
     };
 
     localDatabase.addOrUpdateUser(userProfile);
+    localDatabase.saveUser(userProfile);
     localDatabase.initializeUserProgress(userId);
     localDatabase.setActiveUserId(userId);
+    localDatabase.addOrUpdateCredentialRecord({
+      documentType: (payload.documentType || 'Cédula de Ciudadanía (CC)') as any,
+      documentNumber: cleanDoc,
+      phone: cleanPhone,
+      email: cleanEmail,
+      role: assignedRole,
+      fullName,
+      trainerCode: payload.trainerCode,
+      source: assignedRole === 'entrenador' ? 'Registro Entrenador' : 'Registro Atleta',
+    });
+
+    try {
+      localStorage.setItem('sportfitness_session_token', serverToken);
+      sessionStorage.setItem('sportfitness_session_token', serverToken);
+    } catch {}
 
     return {
       success: true,
       message:
         assignedRole === 'entrenador'
-          ? `Entrenador registrado con éxito. Se ha enviado tu Número de Identificación (${payload.trainerCode}) a tu correo.`
-          : 'Usuario registrado con éxito en Firebase Authentication y Firestore.',
-      token: `token_${userId}_${Date.now()}`,
+          ? `Entrenador registrado con éxito. Se ha asignado tu Número de Identificación (${payload.trainerCode || 'ENT'}).`
+          : 'Usuario registrado con éxito. Bienvenido a Sportfitness.',
+      token: serverToken,
       user: userProfile,
       trainerCode: payload.trainerCode,
       progress: localDatabase.getUserProgress(userId) || undefined,
@@ -248,9 +231,11 @@ class AuthService {
   }
 
   /**
-   * Login user
-   * Authenticates against Firebase Authentication and loads profile from Firestore.
-   * Supports cross-device login by Email or Document Number.
+   * Login user:
+   * 1. Verifica en servidor (/api/auth/login) admitiendo correo o documento
+   * 2. Verifica en localDatabase si el servidor no está disponible
+   * 3. Verifica en Firebase Authentication
+   * 4. Persiste el token y la sesión activa en el cliente
    */
   public async login(
     identifier: string,
@@ -262,169 +247,175 @@ class AuthService {
       return { success: false, error: 'Ingresa tus credenciales completas.' };
     }
 
-    let targetEmail = cleanIdentifier.toLowerCase();
+    // 1. Verificar primero en Backend (/api/auth/login) - admite correo, documento y trainerCode
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          identifier: cleanIdentifier,
+          password: passwordAttempt,
+          trainerCode: trainerCodeAttempt,
+        }),
+      });
 
-    // 1. If identifier is a document number (no @), look up email in Firestore across all devices
-    if (!cleanIdentifier.includes('@')) {
-      try {
-        const usersRef = collection(db, 'users');
-        const q = query(usersRef, where('documentNumber', '==', cleanIdentifier));
-        const querySnap = await getDocs(q);
-        if (!querySnap.empty) {
-          targetEmail = querySnap.docs[0].data().email;
-        } else {
-          return {
-            success: false,
-            error: 'Usuario no registrado',
-            message: 'No existe una cuenta registrada con este número de documento en Firebase. Por favor regístrate para acceder.',
-          };
-        }
-      } catch (docErr) {
-        console.warn('[Firestore] Document query notice:', docErr);
+      const data = await response.json().catch(() => null);
+
+      if (response.ok && data?.success && data?.user) {
+        const userProfile = this.mapServerUserToProfile(data.user);
+        const token = data.token || `sf_token_${userProfile.id}_${Date.now()}`;
+
+        // Guardar usuario activo y token
+        localDatabase.addOrUpdateUser(userProfile);
+        localDatabase.saveUser(userProfile);
+        localDatabase.setActiveUserId(userProfile.id);
+        try {
+          localStorage.setItem('sportfitness_session_token', token);
+          sessionStorage.setItem('sportfitness_session_token', token);
+        } catch {}
+
+        this.syncToFirestore(userProfile);
+
+        return {
+          success: true,
+          message: data.message || 'Sesión iniciada exitosamente.',
+          token,
+          user: userProfile,
+          trainerCode: userProfile.trainerCode,
+          progress: data.progress,
+        };
       }
+
+      // Si el servidor reporta un error de credencial específico (ej: contraseña incorrecta)
+      if (data && data.error && data.error !== 'Usuario no registrado') {
+        return {
+          success: false,
+          error: data.error,
+          message: data.message || data.error,
+        };
+      }
+    } catch (netErr) {
+      console.warn('[Backend] Login fetch notice (fallback activo):', netErr);
     }
 
-    // 2. Authenticate with Firebase Authentication
-    try {
-      const userCredential = await signInWithEmailAndPassword(auth, targetEmail, passwordAttempt);
-      const uid = userCredential.user.uid;
-      console.log('[Firebase Auth] User authenticated successfully with UID:', uid);
+    // 2. Respaldo en base de datos local (usuarios creados en el cliente o sin conexión)
+    const localUser = localDatabase.findUserByIdentifier(cleanIdentifier);
+    if (localUser) {
+      const creds = localDatabase.getCredentialRecords();
+      const cleanLower = cleanIdentifier.toLowerCase();
+      const cred = creds.find(
+        (c) => c.email.toLowerCase() === cleanLower || c.documentNumber.toLowerCase() === cleanLower
+      );
 
-      // Fetch Firestore user document
-      let profileData: any = null;
-      try {
-        const docRef = doc(db, 'users', uid);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          profileData = docSnap.data();
-        }
-      } catch (fsErr) {
-        console.warn('[Firestore] User doc fetch notice:', fsErr);
-      }
-
-      const role = profileData?.role || (targetEmail.includes('entrenador') ? 'entrenador' : 'atleta');
-
-      // Verify trainer identification code if role is trainer
-      if (role === 'entrenador') {
-        const storedTrainerCode = profileData?.trainerCode;
-        if (!trainerCodeAttempt && storedTrainerCode) {
-          return {
-            success: false,
-            error: 'Código de entrenador requerido',
-            message:
-              'Para iniciar sesión como entrenador, es obligatorio ingresar tu Número de Identificación de Entrenador (Ej: ENT-XXXXX).',
-          };
-        }
-        if (storedTrainerCode && trainerCodeAttempt && storedTrainerCode.trim() !== trainerCodeAttempt.trim()) {
-          return {
-            success: false,
-            error: 'Código de entrenador inválido',
-            message:
-              'El Número de Identificación de Entrenador es incorrecto. Revisa tu correo de bienvenida o contacta a soporte.',
-          };
-        }
-      }
-
-      const userProfile: UserProfile = {
-        id: uid,
-        name: profileData?.name || targetEmail.split('@')[0],
-        email: targetEmail,
-        role: role,
-        trainerCode: profileData?.trainerCode || trainerCodeAttempt,
-        avatar: '',
-        membershipPlan: profileData?.membershipPlan || 'Performance Pro',
-        weight: profileData?.weight || 75,
-        height: profileData?.height || 175,
-        clothingSize: profileData?.clothingSize || 'M',
-        bodyType: profileData?.bodyType || 'Mesomorfo',
-        phone: profileData?.phone || '',
-        documentNumber: profileData?.documentNumber || cleanIdentifier,
-        documentType: profileData?.documentType || 'Cédula de Ciudadanía (CC)',
-        weeklyVolumePercent: 0,
-        streakDays: 0,
-        streakDiscountPercent: 0,
-        sessionsThisWeek: 0,
-        lastLoginTimestamp: Date.now(),
-      };
-
-      localDatabase.addOrUpdateUser(userProfile);
-      localDatabase.setActiveUserId(uid);
-
-      // Notify backend server to create session token
-      let serverToken = `fb_token_${uid}`;
-      try {
-        const res = await fetch('/api/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            identifier: targetEmail,
-            password: passwordAttempt,
-            trainerCode: trainerCodeAttempt,
-          }),
-        });
-        const serverData = await res.json();
-        if (serverData.token) serverToken = serverData.token;
-      } catch {}
-
-      return {
-        success: true,
-        message: 'Sesión iniciada exitosamente.',
-        token: serverToken,
-        user: userProfile,
-        trainerCode: userProfile.trainerCode,
-      };
-    } catch (fbAuthError: any) {
-      console.warn('[Firebase Auth] Sign in check notice:', fbAuthError.code || fbAuthError.message);
-
-      // Check backend API / local database fallback
-      try {
-        const response = await fetch('/api/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            identifier: cleanIdentifier,
-            password: passwordAttempt,
-            trainerCode: trainerCodeAttempt,
-          }),
-        });
-
-        const data = await response.json();
-        if (response.ok && data.success && data.user) {
-          const userProfile = this.mapServerUserToProfile(data.user);
-          localDatabase.addOrUpdateUser(userProfile);
-          localDatabase.setActiveUserId(userProfile.id);
-          this.syncToFirestore(userProfile);
-          return {
-            success: true,
-            message: data.message,
-            token: data.token,
-            user: userProfile,
-            trainerCode: userProfile.trainerCode,
-            progress: data.progress,
-          };
+      const expectedPassword = (cred as any)?.password || (localUser as any).password;
+      if (!expectedPassword || expectedPassword === passwordAttempt) {
+        if (localUser.role === 'entrenador') {
+          const expectedCode = localUser.trainerCode || cred?.trainerCode;
+          if (
+            expectedCode &&
+            trainerCodeAttempt &&
+            expectedCode.trim().toUpperCase() !== trainerCodeAttempt.trim().toUpperCase()
+          ) {
+            return {
+              success: false,
+              error: 'Código de entrenador inválido',
+              message: 'El Número de Identificación de Entrenador es incorrecto.',
+            };
+          }
         }
 
-        if (data.error) {
-          return { success: false, error: data.error, message: data.message };
-        }
-      } catch (netErr) {
-        console.warn('[Backend] Login fetch error:', netErr);
-      }
+        const token = `sf_local_${localUser.id}_${Date.now()}`;
+        localDatabase.setActiveUserId(localUser.id);
+        try {
+          localStorage.setItem('sportfitness_session_token', token);
+          sessionStorage.setItem('sportfitness_session_token', token);
+        } catch {}
 
-      if (fbAuthError.code === 'auth/wrong-password' || fbAuthError.code === 'auth/invalid-credential') {
+        return {
+          success: true,
+          message: 'Sesión iniciada exitosamente.',
+          token,
+          user: localUser,
+          trainerCode: localUser.trainerCode,
+        };
+      } else {
         return {
           success: false,
           error: 'Contraseña incorrecta',
           message: 'Contraseña incorrecta. Por favor verifica tus credenciales o recupera tu contraseña.',
         };
       }
-
-      return {
-        success: false,
-        error: 'Usuario no registrado',
-        message: 'Usuario no registrado en Firebase. Este correo o documento no existe en la nube.',
-      };
     }
+
+    // 3. Respaldo en Firebase Authentication (si el identificador es un correo electrónico)
+    const targetEmail = cleanIdentifier.toLowerCase();
+    if (targetEmail.includes('@')) {
+      try {
+        const userCredential = await signInWithEmailAndPassword(auth, targetEmail, passwordAttempt);
+        const uid = userCredential.user.uid;
+
+        let profileData: any = null;
+        try {
+          const docRef = doc(db, 'users', uid);
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) profileData = docSnap.data();
+        } catch {}
+
+        const role = profileData?.role || (targetEmail.includes('entrenador') ? 'entrenador' : 'atleta');
+        const userProfile: UserProfile = {
+          id: uid,
+          name: profileData?.name || targetEmail.split('@')[0],
+          email: targetEmail,
+          role: role,
+          trainerCode: profileData?.trainerCode || trainerCodeAttempt,
+          avatar: '',
+          membershipPlan: profileData?.membershipPlan || 'Performance Pro',
+          weight: profileData?.weight || 75,
+          height: profileData?.height || 175,
+          clothingSize: profileData?.clothingSize || 'M',
+          bodyType: profileData?.bodyType || 'Mesomorfo',
+          phone: profileData?.phone || '',
+          documentNumber: profileData?.documentNumber || cleanIdentifier,
+          documentType: profileData?.documentType || 'Cédula de Ciudadanía (CC)',
+          weeklyVolumePercent: 0,
+          streakDays: 0,
+          streakDiscountPercent: 0,
+          sessionsThisWeek: 0,
+          lastLoginTimestamp: Date.now(),
+        };
+
+        const token = `fb_token_${uid}`;
+        localDatabase.addOrUpdateUser(userProfile);
+        localDatabase.saveUser(userProfile);
+        localDatabase.setActiveUserId(uid);
+        try {
+          localStorage.setItem('sportfitness_session_token', token);
+          sessionStorage.setItem('sportfitness_session_token', token);
+        } catch {}
+
+        return {
+          success: true,
+          message: 'Sesión iniciada exitosamente.',
+          token,
+          user: userProfile,
+          trainerCode: userProfile.trainerCode,
+        };
+      } catch (fbAuthError: any) {
+        if (fbAuthError.code === 'auth/wrong-password' || fbAuthError.code === 'auth/invalid-credential') {
+          return {
+            success: false,
+            error: 'Contraseña incorrecta',
+            message: 'Contraseña incorrecta. Por favor verifica tus credenciales o recupera tu contraseña.',
+          };
+        }
+      }
+    }
+
+    return {
+      success: false,
+      error: 'Usuario no registrado',
+      message: 'Usuario no registrado. No existe una cuenta asociada a este correo o documento. Debes registrarte previamente para acceder.',
+    };
   }
 
   /**

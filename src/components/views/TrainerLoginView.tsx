@@ -24,6 +24,7 @@ import { ScreenId, UserProfile } from '../../types';
 import { EmblemLogo } from '../common/EmblemLogo';
 import { useApp } from '../../context/AppContext';
 import { authService } from '../../services/authService';
+import { localDatabase } from '../../db/localDatabase';
 import { ScrollReveal } from '../common/ScrollReveal';
 
 interface TrainerLoginViewProps {
@@ -35,7 +36,7 @@ export const TrainerLoginView: React.FC<TrainerLoginViewProps> = ({
   onNavigate,
   onLoginSuccess,
 }) => {
-  const { theme, toggleTheme, language, setLanguage, t, openForgotPassword } = useApp();
+  const { theme, toggleTheme, language, setLanguage, t, openForgotPassword, setUser } = useApp();
 
   // STRICT PRIVACY DIRECTIVE: Clean, empty inputs without prefilled coach credentials or listing chips
   const [trainerId, setTrainerId] = useState('');
@@ -83,11 +84,29 @@ export const TrainerLoginView: React.FC<TrainerLoginViewProps> = ({
     setLoading(true);
 
     try {
+      // 1. Proceso de autenticación de entrenador
       const res = await authService.login(cleanId, password, cleanTrainerCode);
 
       if (res.success && res.user) {
+        // 2. Persistir sesión y token en localStorage y sessionStorage
+        const token = res.token || `sf_token_${res.user.id}_${Date.now()}`;
+        try {
+          localStorage.setItem('sportfitness_session_token', token);
+          sessionStorage.setItem('sportfitness_session_token', token);
+        } catch {}
+
+        // 3. Registrar ID activo y sincronizar usuario en base de datos local
+        localDatabase.setActiveUserId(res.user.id);
+        localDatabase.saveUser(res.user);
+
+        // 4. Actualizar estado global en el AppContext
+        setUser(res.user);
+
+        // 5. Redirección inmediata al panel del entrenador
         onLoginSuccess(res.user);
+        onNavigate('trainer-overview');
       } else {
+        // Manejo descriptivo de errores de credenciales
         if (res.error === 'Usuario no registrado') {
           setErrorMessage(
             language === 'es'
@@ -97,8 +116,8 @@ export const TrainerLoginView: React.FC<TrainerLoginViewProps> = ({
         } else if (res.error === 'Contraseña incorrecta') {
           setErrorMessage(
             language === 'es'
-              ? 'Contraseña incorrecta. Por favor verifica tus datos.'
-              : 'Incorrect password. Please verify your credentials.'
+              ? 'Contraseña incorrecta. Por favor verifica tus credenciales o recupera tu contraseña.'
+              : 'Incorrect password. Please verify your credentials or recover your password.'
           );
         } else if (res.error === 'Código de entrenador requerido' || res.error === 'Código de entrenador inválido') {
           setErrorMessage(

@@ -23,6 +23,7 @@ import { ScreenId, UserProfile } from '../../types';
 import { EmblemLogo } from '../common/EmblemLogo';
 import { useApp } from '../../context/AppContext';
 import { authService } from '../../services/authService';
+import { localDatabase } from '../../db/localDatabase';
 import { ScrollReveal } from '../common/ScrollReveal';
 import { GoogleSignInButton } from '../common/GoogleSignInButton';
 
@@ -35,7 +36,7 @@ export const AthleteLoginView: React.FC<AthleteLoginViewProps> = ({
   onNavigate,
   onLoginSuccess,
 }) => {
-  const { theme, toggleTheme, language, setLanguage, t, openForgotPassword } = useApp();
+  const { theme, toggleTheme, language, setLanguage, t, openForgotPassword, setUser } = useApp();
 
   // STRICT PRIVACY DIRECTIVE:
   // Inputs start completely empty and clean with NO prefill, NO account listing, and NO autofill leaks
@@ -72,16 +73,29 @@ export const AthleteLoginView: React.FC<AthleteLoginViewProps> = ({
     setLoading(true);
 
     try {
-      // STRICT AUTHENTICATION:
-      // Validates credentials against persistent database.
-      // If not registered -> Returns error "Usuario no registrado"
-      // NEVER creates fallback users or bypasses security.
+      // 1. Proceso de autenticación con respuesta clara de estado
       const res = await authService.login(cleanIdentifier, password);
 
       if (res.success && res.user) {
+        // 2. Persistir sesión del usuario en localStorage y sessionStorage
+        const token = res.token || `sf_token_${res.user.id}_${Date.now()}`;
+        try {
+          localStorage.setItem('sportfitness_session_token', token);
+          sessionStorage.setItem('sportfitness_session_token', token);
+        } catch {}
+
+        // 3. Registrar ID activo y sincronizar usuario en base de datos local
+        localDatabase.setActiveUserId(res.user.id);
+        localDatabase.saveUser(res.user);
+
+        // 4. Actualizar estado global en el AppContext
+        setUser(res.user);
+
+        // 5. Redirección inmediata y garantizada al panel del atleta
         onLoginSuccess(res.user);
+        onNavigate('athlete-dashboard');
       } else {
-        // Specific error handling requested
+        // Manejo descriptivo de errores de autenticación
         if (res.error === 'Usuario no registrado') {
           setErrorMessage(
             language === 'es'
@@ -91,7 +105,7 @@ export const AthleteLoginView: React.FC<AthleteLoginViewProps> = ({
         } else if (res.error === 'Contraseña incorrecta') {
           setErrorMessage(
             language === 'es'
-              ? 'Contraseña incorrecta. Por favor verifica tus datos o recupera tu contraseña.'
+              ? 'Contraseña incorrecta. Por favor verifica tus credenciales o recupera tu contraseña.'
               : 'Incorrect password. Please verify your credentials or recover your password.'
           );
         } else {

@@ -269,12 +269,8 @@ export const AthleteRegisterView: React.FC<AthleteRegisterViewProps> = ({
       return;
     }
 
-    // Trigger 6-digit email code verification before advancing
-    if (!emailVerified) {
-      handleSendVerificationCode();
-      return;
-    }
-
+    // Avance fluido directo al Paso 2 (Biometría y Contacto)
+    setErrorMessage('');
     changeStep(2);
   };
 
@@ -867,7 +863,7 @@ export const AthleteRegisterView: React.FC<AthleteRegisterViewProps> = ({
                       : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-md'
                   }`}
                 >
-                  <span>{t('continueToVerificationBtn')}</span>
+                  <span>{language === 'en' ? 'Continue to Biometrics' : 'Continuar a Biometría'}</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </div>

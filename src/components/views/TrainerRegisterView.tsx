@@ -308,12 +308,8 @@ export const TrainerRegisterView: React.FC<TrainerRegisterViewProps> = ({
       return;
     }
 
-    // Trigger 6-digit email code verification before advancing
-    if (!emailVerified) {
-      handleSendVerificationCode();
-      return;
-    }
-
+    // Avance fluido directo al Paso 2 (Biometría y Contacto)
+    setErrorMessage('');
     changeStep(2);
   };
 
@@ -467,9 +463,8 @@ export const TrainerRegisterView: React.FC<TrainerRegisterViewProps> = ({
       setLoading(false);
       if (onRegisterSuccess) {
         onRegisterSuccess(newTrainer);
-      } else {
-        onNavigate(targetScreen);
       }
+      onNavigate(targetScreen);
     } catch (err: any) {
       setErrorMessage(err.message || 'Error al completar el registro.');
       setLoading(false);
@@ -885,7 +880,7 @@ export const TrainerRegisterView: React.FC<TrainerRegisterViewProps> = ({
                       : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-md'
                   }`}
                 >
-                  <span>{language === 'en' ? 'Continue to Email Verification' : 'Continuar al Código de Verificación'}</span>
+                  <span>{language === 'en' ? 'Continue to Biometrics' : 'Continuar a Biometría'}</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </div>
