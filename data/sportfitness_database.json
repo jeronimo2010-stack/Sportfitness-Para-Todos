@@ -53,7 +53,7 @@
       "role": "atleta",
       "membershipPlan": "Performance Pro",
       "createdAt": "2026-10-12T23:42:02.887Z",
-      "lastLoginAt": "2026-10-12T23:56:02.457Z",
+      "lastLoginAt": "2026-10-15T20:32:42.023Z",
       "healthProfile": {
         "weight": 49,
         "height": 165,
@@ -141,6 +141,109 @@
           "updatedAt": "2026-10-13T00:02:52.613Z"
         }
       ]
+    },
+    {
+      "id": "google_preview_athlete",
+      "email": "atleta.google@sportfitness.app",
+      "passwordHash": "753baa63eb82f99069fb23e49aaa37574fe37e3f84a16c162b424159076ebb66131f8155beb9a6c19867c8c5cdd7a8cab3d5bb53b38f2afb0c92b63e970765bb",
+      "salt": "50e3f745c9e2ffb5cff6309a9c980c38",
+      "documentType": "Cédula de Ciudadanía (CC)",
+      "documentNumber": "G-87178228",
+      "phone": "+57 300 123 4567",
+      "fullName": "Atleta Sportfitness",
+      "firstName": "Atleta",
+      "lastName": "Sportfitness",
+      "role": "atleta",
+      "membershipPlan": "Performance Pro",
+      "createdAt": "2026-10-15T20:32:06.255Z",
+      "lastLoginAt": "2026-10-15T20:32:06.255Z",
+      "healthProfile": {
+        "weight": 74,
+        "height": 176,
+        "clothingSize": "M",
+        "bodyType": "Mesomorfo",
+        "bmi": 23.9,
+        "bmiCategory": "Composición Atlética Óptima"
+      },
+      "progress": {
+        "userId": "google_preview_athlete",
+        "sessionsCompleted": 0,
+        "weeklyVolumePercent": 0,
+        "totalVolumeKg": 0,
+        "streakDays": 0,
+        "streakDiscountPercent": 0,
+        "activeDaysTotal": 0,
+        "efficiencyScoreAvg": 0,
+        "lastUpdated": "2026-10-15T20:32:06.255Z",
+        "workoutLogs": [],
+        "gpsRoutes": [],
+        "milestones": [
+          {
+            "id": "ms-1792096326265",
+            "date": "2026-10-15",
+            "title": "Cuenta Creada con Google",
+            "description": "Acceso inmediato verificado con cuenta Google."
+          }
+        ]
+      },
+      "notes": [
+        {
+          "id": "note-welcome-1792096326265",
+          "userId": "google_preview_athlete",
+          "title": "Bienvenida a tu Diario de Notas",
+          "content": "Aquí puedes registrar tus sensaciones tras cada entrenamiento, tus marcas personales (1RM), reflexiones de nutrición y notas clave.",
+          "category": "General",
+          "date": "2026-10-15",
+          "pinned": true,
+          "createdAt": "2026-10-15T20:32:06.255Z",
+          "updatedAt": "2026-10-15T20:32:06.255Z"
+        }
+      ]
+    },
+    {
+      "id": "usr-1792096580225-494",
+      "email": "testuser12345@test.com",
+      "passwordHash": "4193834cdce056eaa4dafbb94671d9396f5c3a5f59163181c5a031d10e1396a7c5cd5a7ae93c42acc3f183ae8991cce7e898bfe3a97e031921bb1fb7043e9a5f",
+      "salt": "ba2911e1cf2d33b349833aeb2af303d5",
+      "documentType": "Cédula de Ciudadanía (CC)",
+      "documentNumber": "1234567890",
+      "phone": "+57 3001234567",
+      "fullName": "Test User",
+      "firstName": "Test",
+      "lastName": "User",
+      "role": "atleta",
+      "membershipPlan": "Performance Pro",
+      "createdAt": "2026-10-15T20:36:20.225Z",
+      "lastLoginAt": "2026-10-15T20:36:20.225Z",
+      "healthProfile": {
+        "weight": 75,
+        "height": 175,
+        "clothingSize": "M",
+        "bodyType": "Mesomorfo",
+        "bmi": 24.5,
+        "bmiCategory": "Composición Atlética Óptima"
+      },
+      "progress": {
+        "userId": "usr-1792096580225-494",
+        "sessionsCompleted": 0,
+        "weeklyVolumePercent": 0,
+        "totalVolumeKg": 0,
+        "streakDays": 0,
+        "streakDiscountPercent": 0,
+        "activeDaysTotal": 0,
+        "efficiencyScoreAvg": 0,
+        "lastUpdated": "2026-10-15T20:36:20.225Z",
+        "workoutLogs": [],
+        "gpsRoutes": [],
+        "milestones": [
+          {
+            "id": "ms-1792096580225",
+            "date": "2026-10-15",
+            "title": "Registro de Cuenta Creado",
+            "description": "Inicialización de progreso desde cero con perfil antropométrico vinculado."
+          }
+        ]
+      }
     }
   ],
   "activeSessions": {
@@ -155,6 +258,19 @@
     "27906898ff3995341c89d59c9c2d6763e78eb2e1eefba84cbe16baa108a18f4e": {
       "userId": "usr-g-1791849772626-145",
       "createdAt": "2026-10-13T00:02:52.627Z"
+    },
+    "7ac0007dbb8126f2a4a271138f706d74aec80b1bcd849f9a85ee9daa07f6f485": {
+      "userId": "google_preview_athlete",
+      "createdAt": "2026-10-15T20:32:06.265Z"
+    },
+    "b9b05ea7ba60685ee998235da22c940c27f4128b18d16332a1f451bd9f30fce3": {
+      "userId": "jXXgvzRh1IY74rKUKjbCDxx9noz2",
+      "createdAt": "2026-10-15T20:32:42.023Z"
+    },
+    "976f1ca85ae2cf509989d362ad23444dc814cfe83c5741eba1d3dba29087b628": {
+      "userId": "usr-1792096580225-494",
+      "createdAt": "2026-10-15T20:36:20.226Z"
     }
-  }
+  },
+  "tokens": []
 }

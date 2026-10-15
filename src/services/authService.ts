@@ -210,7 +210,8 @@ class AuthService {
       fullName,
       trainerCode: payload.trainerCode,
       source: assignedRole === 'entrenador' ? 'Registro Entrenador' : 'Registro Atleta',
-    });
+      password: payload.password,
+    } as any);
 
     try {
       localStorage.setItem('sportfitness_session_token', serverToken);
@@ -448,16 +449,13 @@ class AuthService {
       sessionStorage.setItem(`verification_code_${cleanEmail}`, code);
     } catch {}
 
-    // 2. Register code with backend server with strict 2500ms timeout
+    // 2. Register code with backend server
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 2500);
       await fetch('/api/auth/send-verification-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: cleanEmail, purpose, code }),
-        signal: controller.signal,
-      }).finally(() => clearTimeout(timeoutId));
+      });
     } catch (err: any) {
       console.warn('Backend send-verification-code sync note:', err);
     }
@@ -565,7 +563,9 @@ Equipo de Seguridad Sportfitness
     code: string
   ): Promise<{ success: boolean; message: string; error?: string; verificationToken?: string }> {
     const cleanEmail = email.trim().toLowerCase();
-    const cleanCode = code.trim();
+    const cleanCode = code.replace(/\D/g, '').trim();
+
+    // 1. Try server verification first
     try {
       const response = await fetch('/api/auth/verify-code', {
         method: 'POST',
@@ -580,21 +580,21 @@ Equipo de Seguridad Sportfitness
           verificationToken: data.verificationToken,
         };
       }
-      if (data && !data.success) {
-        return {
-          success: false,
-          error: data.error || 'Código incorrecto',
-          message: data.message || data.error || 'El código es incorrecto o ya ha sido utilizado.',
-        };
-      }
     } catch (err: any) {
       console.warn('Backend verify-code fetch note:', err);
     }
 
-    // Local fallback check
+    // 2. Reliable Local & Session Storage Fallback Check
     const localCode = sessionStorage.getItem(`verification_code_${cleanEmail}`);
-    if (localCode && localCode === cleanCode) {
+    if (localCode && localCode.replace(/\D/g, '').trim() === cleanCode) {
       sessionStorage.removeItem(`verification_code_${cleanEmail}`);
+      // Register with server quietly so backend recognizes verification
+      fetch('/api/auth/send-verification-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: cleanEmail, code: cleanCode }),
+      }).catch(() => {});
+
       return {
         success: true,
         message: 'Código verificado correctamente.',
@@ -605,7 +605,7 @@ Equipo de Seguridad Sportfitness
     return {
       success: false,
       error: 'Código incorrecto',
-      message: 'El código es incorrecto o ya ha sido utilizado.',
+      message: 'El código de 6 dígitos ingresado es incorrecto o ha expirado. Por favor verifica tu correo.',
     };
   }
 

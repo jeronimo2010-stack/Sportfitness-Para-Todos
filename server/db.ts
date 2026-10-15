@@ -1261,10 +1261,10 @@ class ServerDatabase {
       }
       const { email, code, is_used, id } = options.where;
 
-      const record = this.db.tokens.find((t) => {
+      const record = this.db.tokens.slice().reverse().find((t) => {
         if (id !== undefined && t.id !== id) return false;
         if (email !== undefined && t.email.trim().toLowerCase() !== email.trim().toLowerCase()) return false;
-        if (code !== undefined && t.code.trim() !== code.trim()) return false;
+        if (code !== undefined && String(t.code).trim() !== String(code).trim()) return false;
         if (is_used !== undefined && t.is_used !== is_used) return false;
         return true;
       });

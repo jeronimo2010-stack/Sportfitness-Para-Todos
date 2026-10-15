@@ -71,8 +71,8 @@ class VerificationService {
     }
     this.usedCodesHistory.set(cleanEmail, history);
 
-    // 3. Expiration time: exactly 5 minutes (300,000 ms)
-    const EXPIRATION_MS = 5 * 60 * 1000;
+    // 3. Expiration time: 15 minutes (900,000 ms) for generous mail delivery window
+    const EXPIRATION_MS = 15 * 60 * 1000;
     const now = Date.now();
     const expiresAt = now + EXPIRATION_MS;
 
@@ -116,7 +116,7 @@ class VerificationService {
       success: true,
       code: numericCode,
       message: `Código de verificación de 6 dígitos enviado exitosamente a ${cleanEmail}. Revisa tu bandeja de entrada o carpeta de spam.`,
-      expiresInSeconds: 300,
+      expiresInSeconds: 900,
     };
   }
 
@@ -129,7 +129,7 @@ class VerificationService {
     purpose: string = 'general'
   ): { success: boolean; message: string } {
     const cleanEmail = (email || '').trim().toLowerCase();
-    const cleanCode = (code || '').trim();
+    const cleanCode = (code || '').replace(/\D/g, '').trim();
     if (!this.isValidEmail(cleanEmail)) {
       return { success: false, message: 'Correo inválido' };
     }
@@ -168,7 +168,7 @@ class VerificationService {
     inputCode: string
   ): Promise<{ success: boolean; error?: string; message: string; verificationToken?: string }> {
     const cleanEmail = (email || '').trim().toLowerCase();
-    const cleanCode = (inputCode || '').trim();
+    const cleanCode = (inputCode || '').replace(/\D/g, '').trim();
 
     // 1. Email format check
     if (!this.isValidEmail(cleanEmail)) {
@@ -188,18 +188,48 @@ class VerificationService {
       };
     }
 
+    // Check in-memory record first (fast and robust)
+    const memoryRecord = this.codes.get(cleanEmail);
+    const now = Date.now();
+    const memoryValid = memoryRecord && !memoryRecord.used && memoryRecord.code === cleanCode && now <= memoryRecord.expiresAt;
+
+    if (memoryValid) {
+      memoryRecord.used = true;
+      // Mark as used in db.tokens as well if present
+      db.tokens.findOne({ where: { email: cleanEmail, code: cleanCode, is_used: false } })
+        .then((tok) => {
+          if (tok) db.tokens.update({ is_used: true }, { where: { id: tok.id } });
+        })
+        .catch(() => {});
+
+      const verificationToken = `vtok_${crypto.randomBytes(24).toString('hex')}`;
+      this.verifiedTokens.set(verificationToken, {
+        token: verificationToken,
+        email: cleanEmail,
+        purpose: memoryRecord.purpose || 'general',
+        expiresAt: Date.now() + 15 * 60 * 1000,
+        createdAt: Date.now(),
+      });
+
+      return {
+        success: true,
+        message: 'Código verificado correctamente.',
+        verificationToken,
+      };
+    }
+
+    // Try persistent db.tokens check
     try {
       const verif = await verificarCodigo(cleanEmail, cleanCode);
-      const record = this.codes.get(cleanEmail);
-      if (record) {
-        record.used = true;
+      if (memoryRecord) {
+        memoryRecord.used = true;
       }
 
       const verificationToken = `vtok_${crypto.randomBytes(24).toString('hex')}`;
       this.verifiedTokens.set(verificationToken, {
         token: verificationToken,
         email: cleanEmail,
-        purpose: record?.purpose || 'general',
+        purpose: memoryRecord?.purpose || 'general',
         expiresAt: Date.now() + 15 * 60 * 1000,
         createdAt: Date.now(),
       });
@@ -210,25 +240,6 @@ class VerificationService {
         verificationToken,
       };
     } catch (dbErr: any) {
-      // In-memory fallback if token was only cached in memory
-      const record = this.codes.get(cleanEmail);
-      if (record && !record.used && record.code === cleanCode && Date.now() <= record.expiresAt) {
-        record.used = true;
-        const verificationToken = `vtok_${crypto.randomBytes(24).toString('hex')}`;
-        this.verifiedTokens.set(verificationToken, {
-          token: verificationToken,
-          email: cleanEmail,
-          purpose: record.purpose,
-          expiresAt: Date.now() + 15 * 60 * 1000,
-          createdAt: Date.now(),
-        });
-        return {
-          success: true,
-          message: 'Código verificado correctamente.',
-          verificationToken,
-        };
-      }
-
       return {
         success: false,
         error: 'verification_failed',

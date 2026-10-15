@@ -186,7 +186,7 @@ export const translations = {
     prefLanguage: 'Idioma de la Interfaz',
     prefSecurity: 'Seguridad y Contraseña',
     prefBiometrics: 'Datos Biométricos',
-    changePassword: 'Cambiar o Recuperar Contraseña',
+    changePassword: 'Cambiar Contraseña',
     dangerZone: 'Zona de Cuenta y Privacidad',
     logoutConfirmation: '¿Estás seguro de que deseas cerrar sesión?',
 
@@ -727,7 +727,7 @@ export const translations = {
     prefLanguage: 'Interface Language',
     prefSecurity: 'Security & Password',
     prefBiometrics: 'Biometric Metrics',
-    changePassword: 'Change or Reset Password',
+    changePassword: 'Change Password',
     dangerZone: 'Account Actions & Privacy',
     logoutConfirmation: 'Are you sure you want to log out?',
 
