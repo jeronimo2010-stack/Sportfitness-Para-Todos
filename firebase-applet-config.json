@@ -1,12 +1,10 @@
 {
-  "projectId": "moonlit-analyst-z8chg",
-  "appId": "1:357546095447:web:807d8f15fcf7ca1a294412",
-  "apiKey": "AIzaSyCahHTOYACdYgLByEYgfbwX4oFqhLpS9qI",
-  "authDomain": "moonlit-analyst-z8chg.firebaseapp.com",
-  "firestoreDatabaseId": "ai-studio-remixremixsportf-f2db5ca4-6c66-43a6-b9d4-b80d916774b1",
-  "storageBucket": "moonlit-analyst-z8chg.firebasestorage.app",
-  "messagingSenderId": "357546095447",
-  "measurementId": "",
-  "oAuthClientId": "357546095447-kagb01ojvks7kkba5au5j5kmbpikkd38.apps.googleusercontent.com",
-  "recaptchaSiteKey": ""
+  "projectId": "sportfitness-fdf73",
+  "appId": "1:120325176727:web:34b3feca36d778e4b218d2",
+  "apiKey": "AIzaSyDm91EGXiIleYm_f48_koDJ3qzgd1i2ums",
+  "authDomain": "sportfitness-fdf73.firebaseapp.com",
+  "firestoreDatabaseId": "(default)",
+  "storageBucket": "sportfitness-fdf73.firebasestorage.app",
+  "messagingSenderId": "120325176727",
+  "measurementId": "G-1D0T36QDVQ"
 }

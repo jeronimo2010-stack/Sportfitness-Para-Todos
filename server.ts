@@ -401,20 +401,10 @@ app.post("/api/auth/forgot-password/send-code", async (req, res) => {
 
     const cleanEmail = email.trim().toLowerCase();
 
-    // Verify user exists in the system database
-    const user = serverDatabase.findUserByEmail(cleanEmail);
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        error: "Usuario no encontrado",
-        message: "No encontramos ninguna cuenta registrada con este correo electrónico. Por favor verifica tus datos o regístrate.",
-      });
-    }
-
     // If client supplied code to register
     if (customCode && typeof customCode === "string" && customCode.trim().length === 6) {
       verificationService.registerCode(cleanEmail, customCode.trim(), "password_reset");
-      // Dispatch via SendGrid / SMTP without blocking HTTP response
+      // Dispatch via SendGrid as well without blocking HTTP response
       emailService.sendVerificationEmail(cleanEmail, customCode.trim(), "password_reset").then((res) => {
         console.log(`[SendGrid Direct] Password reset email dispatched to ${cleanEmail}:`, res);
       }).catch((e) =>

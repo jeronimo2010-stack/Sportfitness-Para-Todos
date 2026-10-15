@@ -638,33 +638,18 @@ Equipo de Seguridad Sportfitness
       sessionStorage.setItem(`recovery_code_${cleanEmail}`, code);
     } catch {}
 
-    // 1. Verify user exists in backend or local database
-    const localUser = localDatabase.findUserByEmail(cleanEmail);
-    let serverResData: any = null;
-
+    // 2. Register code with backend server with 2500ms timeout
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3500);
-      const res = await fetch('/api/auth/forgot-password/send-code', {
+      const timeoutId = setTimeout(() => controller.abort(), 2500);
+      await fetch('/api/auth/forgot-password/send-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: cleanEmail, code }),
         signal: controller.signal,
       }).finally(() => clearTimeout(timeoutId));
-      serverResData = await res.json();
-
-      if (!res.ok && res.status === 404 && !localUser) {
-        return {
-          success: false,
-          error: 'Usuario no encontrado',
-          message: serverResData?.message || 'No existe ninguna cuenta registrada con este correo electrónico. Por favor verifica tus datos o regístrate.',
-        };
-      }
     } catch (err: any) {
       console.warn('Backend forgot-password fetch note:', err);
-      if (!localUser) {
-        // If server failed and local doesn't have it, still check if it's a valid format or return
-      }
     }
 
     const subject = `Código de recuperación Sportfitness: ${code}`;
@@ -675,7 +660,7 @@ Recibimos una solicitud para restablecer la contraseña de tu cuenta Sportfitnes
 
 Tu código de recuperación de 6 dígitos es: ${code}
 
-Este código tiene una validez de 10 minutos.
+Este código tiene una validez de 5 minutos.
 Si tú no realizaste esta solicitud, puedes ignorar este mensaje; tu contraseña actual no será modificada.
 
 Equipo de Seguridad Sportfitness
@@ -711,7 +696,7 @@ Equipo de Seguridad Sportfitness
           ${code}
         </div>
         <div style="font-size: 12px; color: #a0a0b0; margin-top: 8px;">
-          ⏱️ Válido durante <strong>10 minutos</strong>
+          ⏱️ Válido durante <strong>5 minutos</strong>
         </div>
       </div>
     </div>

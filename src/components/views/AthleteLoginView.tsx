@@ -26,7 +26,6 @@ import { authService } from '../../services/authService';
 import { localDatabase } from '../../db/localDatabase';
 import { ScrollReveal } from '../common/ScrollReveal';
 import { GoogleSignInButton } from '../common/GoogleSignInButton';
-import { EmailVerificationModal } from '../common/EmailVerificationModal';
 
 interface AthleteLoginViewProps {
   onNavigate: (screen: ScreenId) => void;
@@ -47,7 +46,6 @@ export const AthleteLoginView: React.FC<AthleteLoginViewProps> = ({
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [isCodeLoginOpen, setIsCodeLoginOpen] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -438,20 +436,6 @@ export const AthleteLoginView: React.FC<AthleteLoginViewProps> = ({
               <span>{loading ? (language === 'en' ? 'Verifying...' : 'Verificando...') : t('login')}</span>
               <ArrowRight className="w-4 h-4" />
             </button>
-
-            {/* Login with 6-digit verification code */}
-            <button
-              type="button"
-              onClick={() => setIsCodeLoginOpen(true)}
-              className={`w-full py-2.5 px-4 rounded-xl font-mono text-xs font-semibold transition-all flex items-center justify-center gap-2 border cursor-pointer mt-2 ${
-                isDark
-                  ? 'border-[#2D2D3E] text-neutral-300 hover:border-[#56A867] hover:text-[#56A867] bg-[#14141C]'
-                  : 'border-slate-300 text-slate-700 hover:border-emerald-600 hover:text-emerald-700 bg-white shadow-sm'
-              }`}
-            >
-              <KeyRound className="w-3.5 h-3.5" />
-              <span>{language === 'en' ? 'Or login with 6-digit email code' : 'O acceder con código de 6 dígitos al correo'}</span>
-            </button>
           </form>
 
           {/* Divider */}
@@ -500,22 +484,6 @@ export const AthleteLoginView: React.FC<AthleteLoginViewProps> = ({
           </p>
         </div>
       </div>
-
-      {/* 6-Digit Email Code Login Modal */}
-      <EmailVerificationModal
-        isOpen={isCodeLoginOpen}
-        onClose={() => setIsCodeLoginOpen(false)}
-        email={identifier.includes('@') ? identifier.trim() : ''}
-        purpose="login"
-        onSuccess={(verifiedEmail) => {
-          setIsCodeLoginOpen(false);
-          const user = localDatabase.findUserByEmail(verifiedEmail);
-          if (user) {
-            onLoginSuccess(user);
-            onNavigate('athlete-dashboard');
-          }
-        }}
-      />
     </div>
   );
 };

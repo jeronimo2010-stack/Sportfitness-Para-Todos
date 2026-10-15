@@ -336,19 +336,13 @@ class ServerDatabase {
           this.db.users = getInitialSeedUsers();
           this.saveToFile();
         } else {
-          // Ensure all essential seed users (admin, mateo, carlos) are present
-          const seedUsers = getInitialSeedUsers();
-          let modified = false;
-          for (const seed of seedUsers) {
-            const exists = this.db.users.some(
-              (u) => u.email.toLowerCase() === seed.email.toLowerCase() || u.id === seed.id
-            );
-            if (!exists) {
-              this.db.users.push(seed);
-              modified = true;
-            }
-          }
-          if (modified) {
+          // Verify admin user is present
+          const hasAdmin = this.db.users.some(
+            (u) => u.role === 'admin' || u.email.toLowerCase() === 'admin@sportfitness.com'
+          );
+          if (!hasAdmin) {
+            const adminUser = getInitialSeedUsers()[0];
+            this.db.users.unshift(adminUser);
             this.saveToFile();
           }
         }
