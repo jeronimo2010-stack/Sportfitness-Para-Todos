@@ -273,6 +273,16 @@ export interface ScheduledSession {
   estimatedKcal: number;
   completed: boolean;
   intensity: 'Baja' | 'Media' | 'Alta';
+  exercises?: string[];
+  notes?: string;
+}
+
+export interface DayCalendarOverride {
+  day: number;
+  status: 'training' | 'rest';
+  restType?: 'Descanso Total' | 'Descanso Activo' | 'Movilidad & Recuperación' | 'Recarga de Glucógeno';
+  restNotes?: string;
+  updatedAt?: string;
 }
 
 export interface MealItem {

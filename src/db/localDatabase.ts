@@ -3,7 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { UserProfile, DocumentType, StoredCredentialRecord, UserRole, UserNote } from '../types';
+import { UserProfile, DocumentType, StoredCredentialRecord, UserRole, UserNote, ScheduledSession, DayCalendarOverride } from '../types';
+import { initialCalendarSessions } from '../data/initialData';
 
 const STORAGE_KEYS = {
   USERS: 'sportfitness_local_users_v3',
@@ -14,6 +15,8 @@ const STORAGE_KEYS = {
   NEWS: 'sportfitness_weekly_news_v3',
   CREDENTIALS: 'sportfitness_credentials_database_v3',
   USER_NOTES: 'sportfitness_user_notes_v3',
+  CALENDAR_SESSIONS: 'sportfitness_calendar_sessions_v3',
+  CALENDAR_OVERRIDES: 'sportfitness_calendar_overrides_v3',
 };
 
 export const INITIAL_CREDENTIAL_RECORDS: StoredCredentialRecord[] = [];
@@ -1099,5 +1102,64 @@ export const localDatabase = {
     this.setActiveUserId(newId);
 
     return { success: true, user: newUser };
+  },
+
+  // --- CALENDAR MANAGEMENT ---
+  getCalendarSessions(): ScheduledSession[] {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEYS.CALENDAR_SESSIONS);
+      if (!raw) {
+        localStorage.setItem(STORAGE_KEYS.CALENDAR_SESSIONS, JSON.stringify(initialCalendarSessions));
+        return initialCalendarSessions;
+      }
+      return JSON.parse(raw);
+    } catch {
+      return initialCalendarSessions;
+    }
+  },
+
+  saveCalendarSessions(sessions: ScheduledSession[]): void {
+    try {
+      localStorage.setItem(STORAGE_KEYS.CALENDAR_SESSIONS, JSON.stringify(sessions));
+    } catch (e) {
+      console.error('Error saving calendar sessions to localDatabase', e);
+    }
+  },
+
+  getCalendarOverrides(): Record<number, DayCalendarOverride> {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEYS.CALENDAR_OVERRIDES);
+      if (!raw) {
+        return {};
+      }
+      return JSON.parse(raw);
+    } catch {
+      return {};
+    }
+  },
+
+  saveCalendarOverrides(overrides: Record<number, DayCalendarOverride>): void {
+    try {
+      localStorage.setItem(STORAGE_KEYS.CALENDAR_OVERRIDES, JSON.stringify(overrides));
+    } catch (e) {
+      console.error('Error saving calendar overrides to localDatabase', e);
+    }
+  },
+
+  saveDayOverrides(overrides: Record<number, DayCalendarOverride>): void {
+    this.saveCalendarOverrides(overrides);
+  },
+
+  resetCalendarToRecommended(): { sessions: ScheduledSession[]; overrides: Record<number, DayCalendarOverride> } {
+    try {
+      localStorage.setItem(STORAGE_KEYS.CALENDAR_SESSIONS, JSON.stringify(initialCalendarSessions));
+      localStorage.removeItem(STORAGE_KEYS.CALENDAR_OVERRIDES);
+    } catch (e) {
+      console.error('Error resetting calendar to recommended in localDatabase', e);
+    }
+    return {
+      sessions: initialCalendarSessions,
+      overrides: {},
+    };
   },
 };
