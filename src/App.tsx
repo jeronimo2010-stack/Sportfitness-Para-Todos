@@ -30,7 +30,7 @@ import { LiveWorkoutView } from './components/views/LiveWorkoutView';
 import { CalendarView } from './components/views/CalendarView';
 import { NutritionView } from './components/views/NutritionView';
 import { ReviewsView } from './components/views/ReviewsView';
-import { ExerciseLibraryView } from './components/views/ExerciseLibraryView';
+import { ExerciseVideoLibraryView } from './components/views/ExerciseVideoLibraryView';
 import { SettingsView } from './components/views/SettingsView';
 import { WeeklyNewsView } from './components/views/WeeklyNewsView';
 import { DatabaseManagerView } from './components/views/DatabaseManagerView';
@@ -278,7 +278,7 @@ function MainAppContent() {
           )}
 
           {(currentScreen === 'exercises' || currentScreen === 'exercise-library' || currentScreen === 'exercise-videos' || currentScreen === 'videos-tutoriales') && (
-            <ExerciseLibraryView onNavigate={navigateTo} />
+            <ExerciseVideoLibraryView onNavigate={navigateTo} />
           )}
 
           {currentScreen === 'weekly-news' && (
