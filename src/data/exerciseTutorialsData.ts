@@ -758,3 +758,296 @@ export const EXERCISE_TUTORIALS: ExerciseTutorial[] = [
     ],
   },
 ];
+
+export interface PeopleWorkout {
+  id: string;
+  athleteName: string;
+  athleteRole: 'Atleta' | 'Entrenador' | 'Coach Pro';
+  athleteAvatar?: string;
+  title: string;
+  titleEn: string;
+  description: string;
+  descriptionEn: string;
+  category: 'Fuerza' | 'Funcional' | 'Calistenia' | 'Hipertrofia' | 'HIIT' | 'Core';
+  targetArea: string;
+  duration: string;
+  difficulty: 'Principiante' | 'Intermedio' | 'Avanzado';
+  youtubeId: string;
+  youtubeUrl: string;
+  exercisesList: string[];
+  athleteTip: string;
+  athleteTipEn: string;
+  viewsCount: number;
+}
+
+export const PEOPLE_WORKOUTS: PeopleWorkout[] = [
+  {
+    id: 'pw-mateo-calisthenics',
+    athleteName: 'Mateo Gómez',
+    athleteRole: 'Atleta',
+    title: 'Rutina de Calistenia: Dominadas y Empujes Estrictos',
+    titleEn: 'Calisthenics Routine: Strict Pull-Ups & Push Power',
+    description: 'Sesión de entrenamiento de peso corporal enfocada en fuerza relativa, retracción escapular y bloqueos limpios en barra.',
+    descriptionEn: 'Bodyweight session focused on relative pulling power, scapular control, and clean lockout reps on the bar.',
+    category: 'Calistenia',
+    targetArea: 'Espalda y Pecho',
+    duration: '22 min',
+    difficulty: 'Avanzado',
+    youtubeId: 'eGo4IYlbE5g',
+    youtubeUrl: 'https://www.youtube.com/watch?v=eGo4IYlbE5g',
+    exercisesList: ['Dominadas pronas 4x8', 'Fondos en paralelas 4x10', 'Flexiones diamante 3x12', 'Cuelgue activo 3x45s'],
+    athleteTip: 'Concéntrate en activar dorsales antes de flexionar los codos para no cargar el manguito rotador.',
+    athleteTipEn: 'Engage your lats first before bending elbows to protect rotator cuffs.',
+    viewsCount: 1420,
+  },
+  {
+    id: 'pw-camila-squats',
+    athleteName: 'Camila Torres',
+    athleteRole: 'Atleta',
+    title: 'Día Pesado de Sentadilla y Control de Profundidad',
+    titleEn: 'Heavy Squat Day & Depth Control Session',
+    description: 'Entrenamiento enfocado en técnica de sentadilla profunda, tempo excéntrico de 3 segundos y empuje explosivo desde el hoyo.',
+    descriptionEn: 'Focus workout on deep squat mechanics, 3-second eccentric tempo, and powerful drive out of the bottom position.',
+    category: 'Fuerza',
+    targetArea: 'Piernas y Glúteos',
+    duration: '28 min',
+    difficulty: 'Intermedio',
+    youtubeId: 'aclHkVaku9U',
+    youtubeUrl: 'https://www.youtube.com/watch?v=aclHkVaku9U',
+    exercisesList: ['Sentadilla trasera 4x6 (RPE 8)', 'Sentadilla frontal 3x8', 'Zancadas estáticas 3x10 por pierna'],
+    athleteTip: 'Abre bien el suelo con los pies y mantén las costillas encajadas con el abdomen.',
+    athleteTipEn: 'Screw feet firmly into floor and maintain tight abdominal brace.',
+    viewsCount: 2890,
+  },
+  {
+    id: 'pw-david-hiit',
+    athleteName: 'David León',
+    athleteRole: 'Entrenador',
+    title: 'Circuito Metabólico HIIT sin Equipamiento',
+    titleEn: 'No-Equipment Metabolic HIIT Circuit',
+    description: 'Sesión continua de intervalos de alta intensidad para quema calórica, aceleración de frecuencia cardíaca y resistencia muscular.',
+    descriptionEn: 'High intensity continuous interval session for metabolic burn, cardiovascular stamina, and endurance.',
+    category: 'HIIT',
+    targetArea: 'Cuerpo Completo',
+    duration: '18 min',
+    difficulty: 'Intermedio',
+    youtubeId: 'auBLPXO8Fww',
+    youtubeUrl: 'https://www.youtube.com/watch?v=auBLPXO8Fww',
+    exercisesList: ['Burpees con salto 40s', 'Mountain climbers 40s', 'Saltos de tijera 40s', 'Descanso activo 20s'],
+    athleteTip: 'Mantén un ritmo respiratorio sincronizado con cada repetición para retrasar el lactato.',
+    athleteTipEn: 'Sync breathing pace with each repetition to delay muscle burn.',
+    viewsCount: 3120,
+  },
+  {
+    id: 'pw-sofia-lowerbody',
+    athleteName: 'Sofía Morales',
+    athleteRole: 'Atleta',
+    title: 'Activación y Esculpir Glúteos y Piernas en Casa',
+    titleEn: 'Glute Activation & Lower Body Home Workout',
+    description: 'Rutina dinámica con puente de glúteos unilateral, zancadas búlgaras y tensión constante para tonificar sin dolor lumbar.',
+    descriptionEn: 'Dynamic lower body workout with single-leg hip bridges, Bulgarian lunges, and constant tension for glutes.',
+    category: 'Funcional',
+    targetArea: 'Glúteos e Isquios',
+    duration: '25 min',
+    difficulty: 'Principiante',
+    youtubeId: 'wPM8icPu6H8',
+    youtubeUrl: 'https://www.youtube.com/watch?v=wPM8icPu6H8',
+    exercisesList: ['Puente de glúteos 4x15 con pausa', 'Zancadas alternas 3x12', 'Elevación de talones 4x20'],
+    athleteTip: 'Aprieta 2 segundos en el punto más alto del puente para máxima activación muscular.',
+    athleteTipEn: 'Squeeze glutes for 2 solid seconds at top of bridge for peak activation.',
+    viewsCount: 1980,
+  },
+  {
+    id: 'pw-carlos-upperbody',
+    athleteName: 'Carlos Rodríguez',
+    athleteRole: 'Coach Pro',
+    title: 'Sesión de Empujes: Hombros y Pectorales con Mancuernas',
+    titleEn: 'Push Workout: Dumbbell Shoulders & Chest Hypertrophy',
+    description: 'Enfoque de hipertrofia con sobrecarga progresiva en press militar, elevaciones laterales y flexiones mecánicas.',
+    descriptionEn: 'Hypertrophy focus on progressive overload with dumbbell overhead presses, lateral raises, and pushups.',
+    category: 'Hipertrofia',
+    targetArea: 'Hombros y Pecho',
+    duration: '32 min',
+    difficulty: 'Avanzado',
+    youtubeId: '2yjwXTZQDDI',
+    youtubeUrl: 'https://www.youtube.com/watch?v=2yjwXTZQDDI',
+    exercisesList: ['Press militar 4x8-10', 'Elevaciones laterales 4x12-15', 'Lagartijas con pausa 3x12', 'Fondos 3x10'],
+    athleteTip: 'Controla la fase excéntrica en 3 segundos; ahí es donde se genera el mayor estímulo de crecimiento.',
+    athleteTipEn: 'Control the lowering eccentric phase for 3 seconds to maximize growth stimulus.',
+    viewsCount: 4210,
+  },
+  {
+    id: 'pw-laura-core',
+    athleteName: 'Laura González',
+    athleteRole: 'Atleta',
+    title: 'Abdomen de Acero: Planchas y Anti-Extensión',
+    titleEn: 'Steel Core Routine: Planks & Anti-Extension',
+    description: 'Rutina funcional para construir un abdomen fuerte y resistente que proteja la columna lumbar en cualquier deporte.',
+    descriptionEn: 'Functional core routine to forge strong abs and lumbar protection for athletes across all sports.',
+    category: 'Core',
+    targetArea: 'Abdomen y Lumbar',
+    duration: '15 min',
+    difficulty: 'Principiante',
+    youtubeId: 'ASdvN_XEl_c',
+    youtubeUrl: 'https://www.youtube.com/watch?v=ASdvN_XEl_c',
+    exercisesList: ['Plancha isométrica 4x45s', 'Plancha lateral 3x30s por lado', 'Crunches controlados 3x15', 'Deadbug 3x12'],
+    athleteTip: 'Empuja el piso con fuerza desde los antebrazos; nunca dejes que la cadera cuelgue.',
+    athleteTipEn: 'Push the ground away through your forearms; never allow your hips to sag.',
+    viewsCount: 1750,
+  },
+  {
+    id: 'pw-andres-arms',
+    athleteName: 'Andrés Pardo',
+    athleteRole: 'Atleta',
+    title: 'Brazos Completos: Super-Serie Bíceps y Tríceps',
+    titleEn: 'Complete Arms Super-Set: Biceps & Triceps Blast',
+    description: 'Entrenamiento de bombeo muscular combinando curl supinado y fondos de tríceps en banco sin descanso entre series.',
+    descriptionEn: 'High-volume arm pump workout pairing dumbbell supinated curls with bench dips back-to-back.',
+    category: 'Hipertrofia',
+    targetArea: 'Brazos (Bíceps y Tríceps)',
+    duration: '24 min',
+    difficulty: 'Intermedio',
+    youtubeId: 'ykJmrZ5v0Oo',
+    youtubeUrl: 'https://www.youtube.com/watch?v=ykJmrZ5v0Oo',
+    exercisesList: ['Curl de bíceps + Fondos 4x10 superserie', 'Curl martillo 3x12', 'Flexiones diamante 3x al fallo'],
+    athleteTip: 'Fija los codos como una bisagra; cero balanceo lumbar para aislar el bíceps al 100%.',
+    athleteTipEn: 'Pin elbows tight like hinges; zero body swing to isolate arms completely.',
+    viewsCount: 2640,
+  },
+  {
+    id: 'pw-valentina-back',
+    athleteName: 'Valentina Vega',
+    athleteRole: 'Coach Pro',
+    title: 'Densidad y Fuerza de Espalda con Remo Unilateral',
+    titleEn: 'Back Density & Strength with Single-Arm Rows',
+    description: 'Sesión técnica para activar dorsales, romboides y mejorar la postura de oficina mediante tracciones controladas.',
+    descriptionEn: 'Technical session to fire up lats, rhomboids, and fix desk posture through clean horizontal pulls.',
+    category: 'Fuerza',
+    targetArea: 'Espalda y Dorsales',
+    duration: '26 min',
+    difficulty: 'Intermedio',
+    youtubeId: 'roCP6wCXPqo',
+    youtubeUrl: 'https://www.youtube.com/watch?v=roCP6wCXPqo',
+    exercisesList: ['Remo unilateral con mancuerna 4x10 por brazo', 'Jalón con banda elástica 4x12', 'Paseo del granjero 3x40m'],
+    athleteTip: 'Imagina que tiras del peso con el codo hacia el bolsillo de la cadera, no con la muñeca.',
+    athleteTipEn: 'Drive your elbow straight back toward your hip pocket instead of pulling with wrists.',
+    viewsCount: 3480,
+  },
+];
+
+export interface YouTubeWorkoutSession {
+  id: string;
+  title: string;
+  titleEn: string;
+  channelName: string;
+  category: 'Full Body' | 'HIIT' | 'Abdominales' | 'Piernas' | 'Brazos' | 'Estiramiento';
+  duration: string;
+  level: 'Principiante' | 'Intermedio' | 'Todos los niveles';
+  youtubeId: string;
+  youtubeUrl: string;
+  equipment: string;
+  equipmentEn: string;
+  highlight: string;
+  highlightEn: string;
+  caloriesBurnedEstimate: string;
+}
+
+export const YOUTUBE_WORKOUT_SESSIONS: YouTubeWorkoutSession[] = [
+  {
+    id: 'yt-fullbody-20',
+    title: 'Rutina Completa Full Body 20 Minutos sin Equipo',
+    titleEn: '20-Minute Full Body Workout - No Equipment Home Session',
+    channelName: 'Sportfitness Media',
+    category: 'Full Body',
+    duration: '20 min',
+    level: 'Todos los niveles',
+    youtubeId: 'ml6cT4AZdqI',
+    youtubeUrl: 'https://www.youtube.com/watch?v=ml6cT4AZdqI',
+    equipment: 'Peso corporal',
+    equipmentEn: 'Bodyweight only',
+    highlight: 'Ideal para días con poco tiempo: entrena tren superior, inferior y cardio al mismo tiempo.',
+    highlightEn: 'Perfect for busy days: trains upper body, lower body, and cardiovascular engine in 20 min.',
+    caloriesBurnedEstimate: '~210 kcal',
+  },
+  {
+    id: 'yt-abs-15',
+    title: 'Abdominales de Acero 15 Minutos en Colchoneta',
+    titleEn: '15-Minute Intense Ab Workout (Burn Belly Fat)',
+    channelName: 'Fitness Routine Lab',
+    category: 'Abdominales',
+    duration: '15 min',
+    level: 'Intermedio',
+    youtubeId: '1f8yoFFdkcY',
+    youtubeUrl: 'https://www.youtube.com/watch?v=1f8yoFFdkcY',
+    equipment: 'Colchoneta',
+    equipmentEn: 'Mat',
+    highlight: 'Secuencia continua de planchas, crunches y anti-rotación sin descansos prolongados.',
+    highlightEn: 'Non-stop sequence of planks, crunches, and anti-rotational core stabilizers.',
+    caloriesBurnedEstimate: '~130 kcal',
+  },
+  {
+    id: 'yt-upperbody-dumbbells',
+    title: 'Tren Superior con Mancuernas: Pecho, Espalda y Brazos',
+    titleEn: '20-Minute Dumbbell Upper Body Workout (Chest, Back, Arms)',
+    channelName: 'Iron Body Pro',
+    category: 'Brazos',
+    duration: '20 min',
+    level: 'Intermedio',
+    youtubeId: 'UBMk30rjy0o',
+    youtubeUrl: 'https://www.youtube.com/watch?v=UBMk30rjy0o',
+    equipment: 'Par de Mancuernas',
+    equipmentEn: 'Pair of Dumbbells',
+    highlight: 'Trabajo equilibrado de empuje y tracción con cargas progresivas.',
+    highlightEn: 'Balanced push and pull protocol to build upper frame and arm strength.',
+    caloriesBurnedEstimate: '~190 kcal',
+  },
+  {
+    id: 'yt-legs-glutes-home',
+    title: 'Piernas y Glúteos Quema-Fuego en Casa',
+    titleEn: '30-Minute Leg & Glute Burnout at Home',
+    channelName: 'Athletic Legs TV',
+    category: 'Piernas',
+    duration: '30 min',
+    level: 'Todos los niveles',
+    youtubeId: '2pLT-ulgUVs',
+    youtubeUrl: 'https://www.youtube.com/watch?v=2pLT-ulgUVs',
+    equipment: 'Peso corporal',
+    equipmentEn: 'Bodyweight',
+    highlight: 'Sentadillas, zancadas búlgaras y puentes diseñados para congestión muscular profunda.',
+    highlightEn: 'Deep hypertrophy volume with squats, lunges, and glute burn finishers.',
+    caloriesBurnedEstimate: '~270 kcal',
+  },
+  {
+    id: 'yt-hiit-cardio-burn',
+    title: 'Cardio HIIT Quema Grasa sin Saltos (Cero Impacto Articular)',
+    titleEn: 'No-Jump Low Impact HIIT Cardio Workout (Knee Friendly)',
+    channelName: 'High Energy Fitness',
+    category: 'HIIT',
+    duration: '20 min',
+    level: 'Principiante',
+    youtubeId: 'M0uO8X3_tEA',
+    youtubeUrl: 'https://www.youtube.com/watch?v=M0uO8X3_tEA',
+    equipment: 'Peso corporal',
+    equipmentEn: 'Bodyweight',
+    highlight: 'Sudoración intensa y aceleración metabólica protegiendo rodillas y tobillos.',
+    highlightEn: 'Intense sweat and high caloric burn protecting joints and tendons.',
+    caloriesBurnedEstimate: '~230 kcal',
+  },
+  {
+    id: 'yt-stretch-mobility',
+    title: 'Estiramiento y Movilidad Completa Post-Entrenamiento',
+    titleEn: '15-Minute Full Body Stretch & Recovery Session',
+    channelName: 'Yoga & Recovery Studio',
+    category: 'Estiramiento',
+    duration: '15 min',
+    level: 'Todos los niveles',
+    youtubeId: 's-7lyvblFNI',
+    youtubeUrl: 'https://www.youtube.com/watch?v=s-7lyvblFNI',
+    equipment: 'Colchoneta',
+    equipmentEn: 'Mat',
+    highlight: 'Descompresión vertebral, apertura de caderas y relajación muscular para el día siguiente.',
+    highlightEn: 'Spinal decompression, hip mobility, and muscular recovery.',
+    caloriesBurnedEstimate: '~70 kcal',
+  },
+];
+

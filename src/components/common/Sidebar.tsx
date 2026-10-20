@@ -27,6 +27,7 @@ import {
   Flame,
   Database,
   Glasses,
+  Tv,
 } from 'lucide-react';
 import { ScreenId, UserProfile } from '../../types';
 import { useApp } from '../../context/AppContext';
@@ -85,6 +86,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
           },
         ]
       : []),
+    {
+      id: 'exercises' as ScreenId,
+      label: language === 'en' ? 'Tutorials & Videos' : 'Tutoriales y Videos',
+      icon: Tv,
+      badge: 'HD',
+    },
     {
       id: 'calendar' as ScreenId,
       label: t('calendar'),
