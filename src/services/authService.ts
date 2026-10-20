@@ -121,15 +121,30 @@ class AuthService {
         }),
       });
       const srvData = await srvRes.json().catch(() => null);
-      if (srvRes.ok && srvData?.success && srvData?.user) {
+      if (srvData?.success && srvData?.user) {
         if (srvData.user.id) userId = srvData.user.id;
         if (srvData.token) serverToken = srvData.token;
-      } else if (srvData?.error && srvData.error.includes('ya se encuentra registrado')) {
-        return {
-          success: false,
-          error: srvData.error,
-          message: srvData.error,
-        };
+      } else if (srvData?.alreadyRegistered) {
+        const local = localDatabase.findUserByEmail(cleanEmail);
+        if (local) {
+          local.weight = Number(payload.weight) || local.weight;
+          local.height = Number(payload.height) || local.height;
+          local.clothingSize = payload.clothingSize || local.clothingSize;
+          local.bodyType = payload.bodyType || local.bodyType;
+          localDatabase.saveUser(local);
+          localDatabase.setActiveUserId(local.id);
+          const tok = `sf_token_${local.id}`;
+          try {
+            localStorage.setItem('sportfitness_session_token', tok);
+            sessionStorage.setItem('sportfitness_session_token', tok);
+          } catch {}
+          return {
+            success: true,
+            user: local,
+            token: tok,
+            message: 'Cuenta existente reconocida. Métricas actualizadas con éxito.',
+          };
+        }
       }
     } catch (srvErr) {
       console.warn('[Backend] /api/auth/register notice:', srvErr);
@@ -166,10 +181,31 @@ class AuthService {
     } catch (fbErr: any) {
       console.warn('[Firebase Auth] Sincronización secundaria notice:', fbErr?.code || fbErr?.message);
       if (fbErr?.code === 'auth/email-already-in-use') {
-        return {
-          success: false,
-          error: 'Este correo electrónico ya está registrado. Por favor inicia sesión directamente.',
-        };
+        try {
+          const cred = await signInWithEmailAndPassword(auth, cleanEmail, payload.password);
+          if (cred?.user?.uid) {
+            userId = cred.user.uid;
+            serverToken = `fb_token_${userId}`;
+            const userRef = doc(db, 'users', userId);
+            await setDoc(
+              userRef,
+              {
+                weight: Number(payload.weight) || 75,
+                height: Number(payload.height) || 175,
+                clothingSize: payload.clothingSize || 'M',
+                bodyType: payload.bodyType || 'Mesomorfo',
+              },
+              { merge: true }
+            );
+          }
+        } catch {
+          // If signIn fails, use localDatabase user if exists
+          const local = localDatabase.findUserByEmail(cleanEmail);
+          if (local) {
+            userId = local.id;
+            serverToken = `sf_token_${userId}`;
+          }
+        }
       }
     }
 

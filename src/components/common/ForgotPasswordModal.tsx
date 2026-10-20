@@ -20,6 +20,7 @@ import {
 import { useApp } from '../../context/AppContext';
 import { localDatabase } from '../../db/localDatabase';
 import { authService } from '../../services/authService';
+import { SixDigitCodeInput } from './SixDigitCodeInput';
 
 export const ForgotPasswordModal: React.FC = () => {
   const { isForgotPasswordOpen, closeForgotPassword, t, theme, language, navigateTo, setUser, user } = useApp();
@@ -376,23 +377,15 @@ export const ForgotPasswordModal: React.FC = () => {
               </p>
 
               {/* 6 Digit Box Inputs */}
-              <div className="flex items-center justify-center gap-2 sm:gap-3 py-3">
-                {[0, 1, 2, 3, 4, 5].map((idx) => (
-                  <input
-                    key={idx}
-                    id={`pin-input-${idx}`}
-                    type="text"
-                    maxLength={1}
-                    value={pin[idx] || ''}
-                    onChange={(e) => handlePinChange(idx, e.target.value)}
-                    className={`w-11 h-12 text-center text-lg font-mono font-bold rounded-xl focus:outline-none transition-all ${
-                      isDark
-                        ? 'bg-[#181824] border border-[#2D2D3E] text-[#56A867] focus:border-[#56A867]'
-                        : 'bg-slate-50 border border-slate-300 text-emerald-700 focus:border-emerald-600'
-                    }`}
-                  />
-                ))}
-              </div>
+              <SixDigitCodeInput
+                value={pin.join('')}
+                onChange={(val) => {
+                  const arr = Array.from({ length: 6 }, (_, i) => val[i] || '');
+                  setPin(arr);
+                }}
+                disabled={isLoading}
+                isDark={isDark}
+              />
 
               {/* Timer and Resend option */}
               <div className="flex flex-col sm:flex-row items-center justify-between gap-2 text-xs pt-1">

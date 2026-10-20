@@ -103,9 +103,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
     {
       id: 'exercises' as ScreenId,
-      label: language === 'en' ? 'Exercises & Videos' : 'Ejercicios & Videos',
+      label: language === 'en' ? 'Videos & Tutorials' : 'Videos y Tutoriales',
       icon: Video,
-      badge: 'YT',
+      badge: 'LIVE',
     },
     ...(!isCoach
       ? [

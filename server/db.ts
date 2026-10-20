@@ -377,7 +377,7 @@ class ServerDatabase {
     this.initialized = true;
   }
 
-  private saveToFile() {
+  public saveToFile() {
     try {
       this.ensureDataDir();
       fs.writeFileSync(DB_FILE, JSON.stringify(this.db, null, 2), 'utf-8');

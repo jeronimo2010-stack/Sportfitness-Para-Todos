@@ -24,6 +24,8 @@ export type ScreenId =
   | 'reviews'
   | 'exercises'
   | 'exercise-library'
+  | 'exercise-videos'
+  | 'videos-tutoriales'
   | 'news'
   | 'novedades'
   | 'weekly-news'
@@ -107,6 +109,7 @@ export interface AuthResponse {
 export interface UserProfile {
   id: string;
   name: string;
+  firstName?: string;
   lastName?: string;
   email: string;
   password?: string;
@@ -240,10 +243,35 @@ export interface CommunityVideo {
   title: string;
   youtubeUrl: string;
   youtubeVideoId: string;
-  tag: 'Pecho' | 'Espalda' | 'Piernas' | 'Hombros' | 'Brazos' | 'Explosividad' | 'Core' | 'General';
+  tag: 'Pecho' | 'Espalda' | 'Piernas' | 'Hombros' | 'Brazos' | 'Explosividad' | 'Core' | 'Cardio' | 'General';
+  muscles?: string[];
+  synonyms?: string[];
+  difficulty?: 'Principiante' | 'Intermedio' | 'Avanzado';
+  duration?: string;
   notes?: string;
   createdAt: string;
   likes?: number;
+}
+
+export interface AthleteRecordedSubmission {
+  id: string;
+  athleteId: string;
+  athleteName: string;
+  athleteRole?: UserRole;
+  exerciseTitle: string;
+  muscleGroup: string;
+  videoUrl?: string; // Object URL or data URL
+  videoBlobSize?: number;
+  notes: string;
+  createdAt: string;
+  status: 'pending' | 'reviewed' | 'approved';
+  coachFeedback?: {
+    coachName: string;
+    coachRole: string;
+    comment: string;
+    score: number; // 1-10
+    reviewedAt: string;
+  };
 }
 
 export interface AthleteRecord {

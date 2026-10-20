@@ -157,7 +157,42 @@ app.post("/api/auth/register", (req, res) => {
     });
 
     if (!result.success || !result.user) {
-      return res.status(400).json({ success: false, error: result.error || "No se pudo registrar el usuario." });
+      if (result.error && result.error.includes("ya se encuentra registrado")) {
+        const cleanEmail = email.trim().toLowerCase();
+        const existing = serverDatabase.findUserByEmail(cleanEmail);
+        if (existing) {
+          // If password matches existing user, authenticate and update biometric metrics!
+          const authCheck = serverDatabase.authenticateUser(cleanEmail, password, trainerCode);
+          if (authCheck.success && authCheck.user) {
+            if (weightNum && heightNum) {
+              authCheck.user.healthProfile = {
+                ...authCheck.user.healthProfile,
+                weight: weightNum,
+                height: heightNum,
+                clothingSize: sizeVal,
+                bodyType: bodyType || authCheck.user.healthProfile?.bodyType || 'Mesomorfo',
+              };
+              serverDatabase.saveToFile();
+            }
+            const token = serverDatabase.createSession(authCheck.user.id);
+            const { passwordHash, salt, ...safeUser } = authCheck.user;
+            return res.status(200).json({
+              success: true,
+              alreadyRegistered: true,
+              message: "Usuario previamente registrado. Sesión autenticada y métricas sincronizadas.",
+              token,
+              user: safeUser,
+              role: safeUser.role,
+              trainerCode: safeUser.trainerCode,
+            });
+          }
+        }
+      }
+      return res.status(400).json({
+        success: false,
+        error: result.error || "No se pudo registrar el usuario.",
+        alreadyRegistered: result.error?.includes("ya se encuentra registrado") || false,
+      });
     }
 
     // If registered user is a trainer, dispatch their exclusive trainer identification number via email

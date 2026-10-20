@@ -277,7 +277,7 @@ function MainAppContent() {
             <ReviewsView onNavigate={navigateTo} user={user} />
           )}
 
-          {(currentScreen === 'exercises' || currentScreen === 'exercise-library') && (
+          {(currentScreen === 'exercises' || currentScreen === 'exercise-library' || currentScreen === 'exercise-videos' || currentScreen === 'videos-tutoriales') && (
             <ExerciseLibraryView onNavigate={navigateTo} />
           )}
 
