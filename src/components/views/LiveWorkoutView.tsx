@@ -67,8 +67,21 @@ export const LiveWorkoutView: React.FC<LiveWorkoutViewProps> = ({
   const [restSeconds, setRestSeconds] = useState(84); // 01:24
   const [isResting, setIsResting] = useState(true);
 
+  const fallbackExercise: ExerciseItem = {
+    id: 'ex-default-squat',
+    name: 'Sentadilla Trasera',
+    category: 'Piernas',
+    primaryMuscle: 'Cuádriceps y Glúteos',
+    description: 'Sentadilla profunda con mecánica biomecánica controlada.',
+    biomechanicalCues: ['Apoyo trípode en pies', 'Bracing intra-abdominal', 'Columna neutral'],
+    commonMistakes: ['Colapso de rodillas', 'Despegue de talones'],
+    videoThumbnail: '',
+    defaultSets: 4,
+    targetRepsRange: '8-10 reps',
+  };
+
   const currentExercise =
-    calibratedExercises[activeExerciseIndex] || calibratedExercises[0];
+    calibratedExercises[activeExerciseIndex] || calibratedExercises[0] || fallbackExercise;
 
   // Dynamic calibrated target weight for current active exercise and user biometrics
   const targetLoadKg = useMemo(() => {

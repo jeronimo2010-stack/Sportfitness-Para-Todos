@@ -26,13 +26,13 @@ class EmailService {
     return (process.env.SENDGRID_API_KEY || '').trim();
   }
   private get sendGridFromEmail(): string {
-    return (process.env.SENDGRID_FROM_EMAIL || process.env.FROM_EMAIL || 'sportfitness112@gmail.com').trim();
+    return (process.env.FROM_EMAIL || process.env.SENDGRID_FROM_EMAIL || '').trim();
   }
   private get sendGridFromName(): string {
     return (process.env.SENDGRID_FROM_NAME || 'Sportfitness').trim();
   }
   private get sendGridReplyTo(): string {
-    return (process.env.SENDGRID_REPLY_TO || 'mateobedoy20@gmail.com').trim();
+    return (process.env.REPLY_TO_EMAIL || process.env.SENDGRID_REPLY_TO || '').trim();
   }
 
   constructor() {
@@ -89,17 +89,24 @@ class EmailService {
       return { success: false, error: 'SENDGRID_API_KEY no configurada en el servidor' };
     }
 
+    if (!this.sendGridFromEmail) {
+      console.error(`[DIAG] [SENDGRID] ERROR: FROM_EMAIL no está configurada en las variables de entorno.`);
+      return { success: false, error: 'FROM_EMAIL no configurada en el servidor' };
+    }
+
     try {
-      const payload = {
+      const payload: Record<string, any> = {
         personalizations: [{ to: [{ email: cleanTo }] }],
         from: { email: this.sendGridFromEmail, name: this.sendGridFromName },
-        reply_to: { email: this.sendGridReplyTo, name: 'Sportfitness' },
         subject,
         content: [
           { type: 'text/plain', value: textContent },
           { type: 'text/html', value: htmlContent },
         ],
       };
+      if (this.sendGridReplyTo) {
+        payload.reply_to = { email: this.sendGridReplyTo, name: 'Sportfitness' };
+      }
 
       console.log(`[DIAG] [SENDGRID] Enviando payload HTTP POST a https://api.sendgrid.com/v3/mail/send para ${masked}...`);
 
@@ -356,7 +363,11 @@ Fecha: ${new Date().toLocaleString()}
     `.trim();
 
     // 1. Send to admin
-    const adminEmail = 'mateobedoy20@gmail.com';
+    const adminEmail = (process.env.ADMIN_EMAIL || process.env.FROM_EMAIL || '').trim();
+    if (!adminEmail) {
+      console.warn('[DIAG] [EMAIL-SVC] No admin email configured for contact form.');
+      return { success: false, error: 'ADMIN_EMAIL o FROM_EMAIL no configurada' };
+    }
     const result = await this.sendViaSendGrid(adminEmail, subject, textContent, htmlContent);
 
     // 2. Also send confirmation to user

@@ -244,6 +244,51 @@
           }
         ]
       }
+    },
+    {
+      "id": "usr-1792695333200-74",
+      "email": "atleta.e2e.1792695333187@sportfitness.app",
+      "passwordHash": "57778615c4c78e72d212dd391c7fb7d48228fd783fa1fcbe56b4882a0f076eea5226dda703cf761b212730728654cdbcb4070811d7894fce01f6534e3c6c675e",
+      "salt": "1061e8db2ab306434e8da37a75481e72",
+      "documentType": "CC",
+      "documentNumber": "DOC1792695333187",
+      "phone": "3001234567",
+      "fullName": "Atleta Prueba Real",
+      "firstName": "Atleta",
+      "lastName": "Prueba Real",
+      "role": "atleta",
+      "membershipPlan": "Performance Pro",
+      "createdAt": "2026-10-22T18:55:33.200Z",
+      "lastLoginAt": "2026-10-22T18:55:33.219Z",
+      "healthProfile": {
+        "weight": 75,
+        "height": 175,
+        "clothingSize": "M",
+        "bodyType": "Mesomorfo",
+        "bmi": 24.5,
+        "bmiCategory": "Composición Atlética Óptima"
+      },
+      "progress": {
+        "userId": "usr-1792695333200-74",
+        "sessionsCompleted": 0,
+        "weeklyVolumePercent": 0,
+        "totalVolumeKg": 0,
+        "streakDays": 0,
+        "streakDiscountPercent": 0,
+        "activeDaysTotal": 0,
+        "efficiencyScoreAvg": 0,
+        "lastUpdated": "2026-10-22T18:55:33.200Z",
+        "workoutLogs": [],
+        "gpsRoutes": [],
+        "milestones": [
+          {
+            "id": "ms-1792695333200",
+            "date": "2026-10-22",
+            "title": "Registro de Cuenta Creado",
+            "description": "Inicialización de progreso desde cero con perfil antropométrico vinculado."
+          }
+        ]
+      }
     }
   ],
   "activeSessions": {
