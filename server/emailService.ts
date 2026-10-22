@@ -134,7 +134,17 @@ class EmailService {
       process.env.SMTP_FROM ||
       (process.env.SMTP_USER ? `"Sportfitness" <${process.env.SMTP_USER}>` : '"Sportfitness Security" <no-reply@sportfitness.com>');
 
-    const subject = `Código de verificación Sportfitness: ${code}`;
+    // Optimize subject line: Do NOT put raw verification numbers in subject line
+    // Having OTP codes in the subject line sent from non-corporate domain triggers aggressive anti-phishing filters
+    const subject =
+      purpose === 'password_reset'
+        ? 'Código para restablecer tu contraseña - Sportfitness'
+        : purpose === 'register_athlete'
+        ? 'Código de verificación para tu registro de Atleta - Sportfitness'
+        : purpose === 'register_trainer'
+        ? 'Código de verificación para tu registro de Entrenador - Sportfitness'
+        : 'Tu código de verificación - Sportfitness';
+
     const purposeText =
       purpose === 'password_reset'
         ? 'la recuperación de tu contraseña'
@@ -229,21 +239,22 @@ Equipo de Seguridad Sportfitness
     // 1. Primary: Send via SendGrid
     if (this.sendGridApiKey) {
       const recipientDomain = cleanTo.split('@')[1] || 'domain';
-      console.log(`[EmailService] Attempting verification email dispatch via SendGrid to @${recipientDomain} (Purpose: ${purpose})`);
+      console.log(`[EmailService] Stage: Dispatching verification email via SendGrid to domain @${recipientDomain} (Purpose: ${purpose})`);
       const sgResult = await this.sendViaSendGrid(cleanTo, subject, textContent, htmlContent);
       if (sgResult.success) {
+        console.log(`[EmailService] Stage: SendGrid accepted message for @${recipientDomain} (MessageId: ${sgResult.messageId})`);
         return sgResult;
       }
-      console.warn(`[EmailService] SendGrid attempt failed for @${recipientDomain}:`, sgResult.error);
+      console.warn(`[EmailService] Stage: SendGrid dispatch failed for @${recipientDomain}: ${sgResult.error}`);
     } else {
-      console.warn('[EmailService] SENDGRID_API_KEY is not configured in environment variables.');
+      console.warn('[EmailService] Stage: SENDGRID_API_KEY is not configured in environment.');
     }
 
     // 2. Secondary: If real SMTP transporter is configured, use it directly!
     if (this.transporter) {
       const recipientDomain = cleanTo.split('@')[1] || 'domain';
       try {
-        console.log(`[EmailService] Attempting verification email dispatch via SMTP to @${recipientDomain}`);
+        console.log(`[EmailService] Stage: Attempting fallback verification dispatch via SMTP to @${recipientDomain}`);
         const info = await this.transporter.sendMail({
           from: fromAddress,
           to: cleanTo,
@@ -252,16 +263,16 @@ Equipo de Seguridad Sportfitness
           html: htmlContent,
         });
 
-        console.log(`[EmailService] Verification email successfully sent via SMTP to @${recipientDomain}. MessageId: ${info.messageId}`);
+        console.log(`[EmailService] Stage: Verification email successfully delivered via SMTP to @${recipientDomain}. MessageId: ${info.messageId}`);
         return { success: true, messageId: info.messageId };
       } catch (err: any) {
-        console.error(`[EmailService] Failed to send email via SMTP to @${recipientDomain}:`, err?.message || err);
+        console.error(`[EmailService] Stage: SMTP dispatch failed for @${recipientDomain}:`, err?.message || err);
       }
     }
 
     // 3. Provider failure: do NOT disguise failure as success
     const recipientDomain = cleanTo.split('@')[1] || 'domain';
-    console.error(`[EmailService] Dispatch failed: No email provider was able to deliver to @${recipientDomain}.`);
+    console.error(`[EmailService] Stage: Dispatch failed. No email provider was able to deliver to @${recipientDomain}.`);
     return {
       success: false,
       error: 'No se pudo enviar el correo de verificación a través de SendGrid ni SMTP. Verifica la configuración del proveedor.',
