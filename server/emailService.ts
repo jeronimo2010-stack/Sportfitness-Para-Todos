@@ -26,7 +26,7 @@ class EmailService {
     return (process.env.SENDGRID_API_KEY || '').trim();
   }
   private get sendGridFromEmail(): string {
-    return (process.env.SENDGRID_FROM_EMAIL || 'sportfitness112@gmail.com').trim();
+    return (process.env.SENDGRID_FROM_EMAIL || process.env.FROM_EMAIL || 'sportfitness112@gmail.com').trim();
   }
   private get sendGridFromName(): string {
     return (process.env.SENDGRID_FROM_NAME || 'Sportfitness').trim();
