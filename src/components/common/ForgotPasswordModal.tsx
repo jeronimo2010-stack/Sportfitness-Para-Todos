@@ -72,18 +72,22 @@ export const ForgotPasswordModal: React.FC = () => {
     setIsLoading(true);
 
     try {
-      await authService.sendForgotPasswordCode(email.trim());
-      setCodeNotification(
-        language === 'en'
-          ? `✉️ 6-digit recovery code sent to ${email.trim()}. Please check your inbox or spam folder.`
-          : `✉️ Hemos enviado un código de recuperación de 6 dígitos a ${email.trim()}. Revisa tu bandeja de entrada o spam.`
-      );
-      setStep(2);
-      setTimer(45);
-      setPin(['', '', '', '', '', '']);
+      const res = await authService.sendForgotPasswordCode(email.trim());
+      if (res.success) {
+        setCodeNotification(
+          res.message ||
+            (language === 'en'
+              ? `✉️ 6-digit recovery code sent to ${email.trim()}. Please check your inbox or spam folder.`
+              : `✉️ Hemos enviado un código de recuperación de 6 dígitos a ${email.trim()}. Revisa tu bandeja de entrada o spam.`)
+        );
+        setStep(2);
+        setTimer(45);
+        setPin(['', '', '', '', '', '']);
+      } else {
+        setError(res.message || 'No se pudo procesar la solicitud de recuperación.');
+      }
     } catch (err: any) {
       setError(err.message || 'Error al conectar con el servidor.');
-      setStep(2);
     } finally {
       setIsLoading(false);
     }

@@ -5,7 +5,7 @@
 
 import { UserProfile, AuthResponse, UserProgressRecord, ClothingSize, BodyType, UserNote, CommunityVideo } from '../types';
 import { localDatabase } from '../db/localDatabase';
-import { db, auth, queueEmailInFirestore } from './firebase';
+import { db, auth } from './firebase';
 import { doc, setDoc, getDoc, collection, query, where, getDocs, deleteDoc } from 'firebase/firestore';
 import {
   createUserWithEmailAndPassword,
@@ -1069,64 +1069,24 @@ class AuthService {
         }),
       });
       if (response.ok) {
-        dispatched = true;
+        const data = await response.json().catch(() => null);
+        if (data?.success) {
+          dispatched = true;
+        } else {
+          console.warn('[authService] Server trainer credential dispatch warning:', data?.error);
+        }
+      } else {
+        console.warn('[authService] Primary sendTrainerCredentialEmail endpoint status:', response.status);
       }
     } catch (err) {
-      console.warn('[authService] Primary sendTrainerCredentialEmail endpoint notice:', err);
-    }
-
-    // 2. Queue in Firestore 'mail' collection (Trigger Email extension)
-    try {
-      await queueEmailInFirestore({
-        to: cleanEmail,
-        subject: `Tu Número de Identificación de Entrenador Sportfitness: ${cleanCode}`,
-        text: `Hola ${cleanName},\n\n¡Bienvenido al equipo de entrenadores de Sportfitness!\n\n${exactNotice}\n\nConsérvalo en un lugar seguro.\n\nEquipo Sportfitness`,
-        html: `
-          <div style="font-family: sans-serif; background-color: #0b0c10; color: #fff; padding: 24px; border-radius: 12px;">
-            <h2 style="color: #56A867; margin-top: 0;">SPORTFITNESS COACH</h2>
-            <p>Hola <strong>${cleanName}</strong>,</p>
-            <p>¡Te damos la bienvenida al equipo oficial de entrenadores!</p>
-            <div style="background-color: #181824; border: 2px solid #56A867; border-radius: 10px; padding: 20px; text-align: center; margin: 20px 0;">
-              <div style="font-size: 13px; color: #e0e0ea; margin-bottom: 8px;">${exactNotice}</div>
-              <div style="font-size: 32px; font-weight: bold; color: #56A867; letter-spacing: 4px; font-family: monospace;">${cleanCode}</div>
-            </div>
-            <p style="font-size: 12px; color: #888;">Sportfitness Security & Training Operations</p>
-          </div>
-        `,
-        senderName: 'Sportfitness Coach Credentials',
-        senderEmail: 'sportfitness112@gmail.com',
-        type: 'trainer_credential',
-        metadata: {
-          trainerCode: cleanCode,
-          coachName: cleanName,
-          sentAt: new Date().toISOString(),
-        },
-      });
-      dispatched = true;
-    } catch (fsErr) {
-      console.warn('[authService] Firestore mail queue notice:', fsErr);
-    }
-
-    // 3. Backup: /api/send-email
-    if (!dispatched) {
-      try {
-        await fetch('/api/send-email', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            to: cleanEmail,
-            subject: `Tu Número de Identificación de Entrenador Sportfitness: ${cleanCode}`,
-            text: `Hola ${cleanName},\n\n${exactNotice}\n\nEquipo Sportfitness`,
-            senderName: 'Sportfitness Coach',
-          }),
-        });
-        dispatched = true;
-      } catch {}
+      console.warn('[authService] Primary sendTrainerCredentialEmail network notice:', err);
     }
 
     return {
-      success: true,
-      message: `Número de Identificación de Entrenador (${cleanCode}) enviado a ${cleanEmail}.`,
+      success: dispatched,
+      message: dispatched
+        ? `Número de Identificación de Entrenador (${cleanCode}) enviado a ${cleanEmail}.`
+        : `Identificación asignada (${cleanCode}), pero hubo una demora al despachar el correo.`,
     };
   }
 

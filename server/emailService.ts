@@ -88,16 +88,27 @@ class EmailService {
 
       if (response.status >= 200 && response.status < 300) {
         const messageId = response.headers.get('x-message-id') || `sg-${Date.now()}`;
-        console.log(`[SendGrid] Email sent successfully to ${cleanTo} (ID: ${messageId})`);
+        const recipientDomain = cleanTo.split('@')[1] || 'domain';
+        console.log(`[EmailService] SendGrid accepted message (status ${response.status}, ID: ${messageId}) for domain: @${recipientDomain}`);
         return { success: true, messageId };
       } else {
         const errText = await response.text();
-        console.warn(`[SendGrid] Non-200 response (${response.status}) to ${cleanTo}:`, errText);
-        return { success: false, error: `SendGrid error (${response.status}): ${errText}` };
+        const recipientDomain = cleanTo.split('@')[1] || 'domain';
+        console.warn(`[EmailService] SendGrid rejected message (status ${response.status}) for domain @${recipientDomain}:`, errText);
+        let userFriendlyError = `SendGrid error (${response.status})`;
+        if (response.status === 401) {
+          userFriendlyError = 'SendGrid: API Key no autorizada o inválida (401)';
+        } else if (response.status === 403) {
+          userFriendlyError = 'SendGrid: Acceso denegado o remitente no verificado (403)';
+        } else if (response.status === 429) {
+          userFriendlyError = 'SendGrid: Límite de tasa de envío alcanzado (429)';
+        }
+        return { success: false, error: `${userFriendlyError}: ${errText}` };
       }
     } catch (err: any) {
-      console.error(`[SendGrid] Fetch failure to ${cleanTo}:`, err);
-      return { success: false, error: err?.message || 'Error al conectar con SendGrid' };
+      const recipientDomain = cleanTo.split('@')[1] || 'domain';
+      console.error(`[EmailService] Network failure connecting to SendGrid for domain @${recipientDomain}:`, err?.message || err);
+      return { success: false, error: err?.message || 'Error de red al conectar con SendGrid' };
     }
   }
 
@@ -217,16 +228,22 @@ Equipo de Seguridad Sportfitness
 
     // 1. Primary: Send via SendGrid
     if (this.sendGridApiKey) {
+      const recipientDomain = cleanTo.split('@')[1] || 'domain';
+      console.log(`[EmailService] Attempting verification email dispatch via SendGrid to @${recipientDomain} (Purpose: ${purpose})`);
       const sgResult = await this.sendViaSendGrid(cleanTo, subject, textContent, htmlContent);
       if (sgResult.success) {
         return sgResult;
       }
-      console.warn('[EmailService] SendGrid attempt failed, trying alternate channels:', sgResult.error);
+      console.warn(`[EmailService] SendGrid attempt failed for @${recipientDomain}:`, sgResult.error);
+    } else {
+      console.warn('[EmailService] SENDGRID_API_KEY is not configured in environment variables.');
     }
 
     // 2. Secondary: If real SMTP transporter is configured, use it directly!
     if (this.transporter) {
+      const recipientDomain = cleanTo.split('@')[1] || 'domain';
       try {
+        console.log(`[EmailService] Attempting verification email dispatch via SMTP to @${recipientDomain}`);
         const info = await this.transporter.sendMail({
           from: fromAddress,
           to: cleanTo,
@@ -235,23 +252,19 @@ Equipo de Seguridad Sportfitness
           html: htmlContent,
         });
 
-        console.log(`[EmailService] Verification email successfully sent via SMTP to ${cleanTo}. MessageId: ${info.messageId}`);
+        console.log(`[EmailService] Verification email successfully sent via SMTP to @${recipientDomain}. MessageId: ${info.messageId}`);
         return { success: true, messageId: info.messageId };
       } catch (err: any) {
-        console.error(`[EmailService] Failed to send email via SMTP to ${cleanTo}:`, err);
+        console.error(`[EmailService] Failed to send email via SMTP to @${recipientDomain}:`, err?.message || err);
       }
     }
 
-    // 3. Fallback
-    console.log(`\n======================================================`);
-    console.log(`[EMAIL DISPATCH] Email to: ${cleanTo}`);
-    console.log(`Subject: ${subject}`);
-    console.log(`Verification Code: ${code} (Expires in 10 minutes)`);
-    console.log(`======================================================\n`);
-
+    // 3. Provider failure: do NOT disguise failure as success
+    const recipientDomain = cleanTo.split('@')[1] || 'domain';
+    console.error(`[EmailService] Dispatch failed: No email provider was able to deliver to @${recipientDomain}.`);
     return {
-      success: true,
-      simulated: true,
+      success: false,
+      error: 'No se pudo enviar el correo de verificación a través de SendGrid ni SMTP. Verifica la configuración del proveedor.',
     };
   }
 
@@ -467,16 +480,11 @@ Equipo Técnico y Metodológico Sportfitness
       }
     }
 
-    console.log(`\n======================================================`);
-    console.log(`[TRAINER CREDENTIAL EMAIL DISPATCH] To: ${cleanTo}`);
-    console.log(`Trainer Name: ${name}`);
-    console.log(`Assigned Trainer Code: ${cleanCode}`);
-    console.log(`Notice: ${mandatoryNotice}`);
-    console.log(`======================================================\n`);
-
+    const recipientDomain = cleanTo.split('@')[1] || 'domain';
+    console.error(`[EmailService] Trainer credential dispatch failed for @${recipientDomain}: No provider available.`);
     return {
-      success: true,
-      simulated: true,
+      success: false,
+      error: 'No se pudo enviar la credencial de entrenador por correo.',
     };
   }
 }
