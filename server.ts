@@ -117,6 +117,7 @@ app.post("/api/auth/register", (req, res) => {
       height,
       clothingSize,
       bodyType,
+      verificationToken,
     } = req.body;
 
     if (!email || !email.trim()) {
@@ -130,6 +131,26 @@ app.post("/api/auth/register", (req, res) => {
     }
     if (!phone || !phone.trim()) {
       return res.status(400).json({ success: false, error: "El número de teléfono es obligatorio." });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+
+    // Security requirement: Require and consume single-use verificationToken issued by server
+    if (!verificationToken || typeof verificationToken !== "string") {
+      return res.status(403).json({
+        success: false,
+        error: "Token de verificación requerido",
+        message: "Debes validar tu correo con el código de 6 dígitos antes de completar tu registro.",
+      });
+    }
+
+    const isTokenValid = verificationService.consumeVerificationToken(verificationToken, cleanEmail);
+    if (!isTokenValid) {
+      return res.status(403).json({
+        success: false,
+        error: "Token expirado o inválido",
+        message: "La sesión de verificación ha expirado o el token es inválido. Solicita un nuevo código de verificación.",
+      });
     }
 
     const weightNum = Number(weight) || 75;
@@ -303,38 +324,32 @@ app.post("/api/auth/login", (req, res) => {
 // Send 6-digit verification code to email (for registration / verification)
 app.post("/api/auth/send-verification-code", async (req, res) => {
   try {
-    const { email, purpose = "registro", code: customCode } = req.body || {};
+    const { email, purpose = "registro" } = req.body || {};
     if (!email || !email.trim()) {
       return res.status(400).json({ success: false, error: "El correo electrónico es requerido." });
     }
 
     const cleanEmail = email.trim().toLowerCase();
+    const clientIp = (
+      (req.headers["x-forwarded-for"] as string)?.split(",")[0] ||
+      req.ip ||
+      req.socket.remoteAddress ||
+      ""
+    ).trim();
 
-    // If client supplied code to register
-    if (customCode && typeof customCode === "string" && customCode.trim().length === 6) {
-      verificationService.registerCode(cleanEmail, customCode.trim(), purpose);
-      // Dispatch via SendGrid as well without blocking HTTP response
-      emailService.sendVerificationEmail(cleanEmail, customCode.trim(), purpose).then((res) => {
-        console.log(`[SendGrid Direct] Verification email dispatched to ${cleanEmail}:`, res);
-      }).catch((e) =>
-        console.warn("[EmailService] Background verification dispatch note:", e?.message)
-      );
-      return res.json({
-        success: true,
-        code: customCode.trim(),
-        message: `Código registrado para ${cleanEmail}.`,
+    const result = await verificationService.generateAndSendCode(cleanEmail, purpose, clientIp);
+    if (!result.success) {
+      return res.status(result.status || 400).json({
+        success: false,
+        error: result.error,
+        message: result.message,
       });
     }
 
-    const result = await verificationService.generateAndSendCode(cleanEmail, purpose);
-    if (!result.success) {
-      return res.status(400).json(result);
-    }
-
+    // Security: NEVER return verification PIN in HTTP response
     return res.json({
       success: true,
-      code: result.code,
-      message: `Código de verificación enviado exitosamente a ${cleanEmail}. Revisa tu bandeja de entrada o carpeta de spam.`,
+      message: result.message,
     });
   } catch (error: any) {
     console.error("send-verification-code error:", error);
@@ -342,39 +357,7 @@ app.post("/api/auth/send-verification-code", async (req, res) => {
   }
 });
 
-// General SendGrid email dispatch endpoint
-app.post("/api/send-email", async (req, res) => {
-  try {
-    const { to, subject, text, html, senderName } = req.body || {};
-    if (!to) {
-      return res.status(400).json({ success: false, error: "Destinatario 'to' requerido." });
-    }
-    const recipients = Array.isArray(to) ? to : [to];
-    const results = await Promise.all(
-      recipients.map((recipient: string) =>
-        emailService.sendViaSendGrid(
-          recipient,
-          subject || "Notificación de Sportfitness",
-          text || "",
-          html || `<p>${(text || "").replace(/\n/g, "<br/>")}</p>`
-        )
-      )
-    );
-    const hasSuccess = results.some((r) => r.success);
-    return res.json({
-      success: hasSuccess,
-      message: hasSuccess
-        ? "Correo enviado exitosamente mediante SendGrid."
-        : "No se pudo despachar el correo.",
-      results,
-    });
-  } catch (error: any) {
-    console.error("/api/send-email error:", error);
-    return res.status(500).json({ success: false, error: "Error en el servidor al despachar correo." });
-  }
-});
-
-// Dedicated trainer credential email dispatch endpoint
+// Dedicated trainer credential email dispatch endpoint (requires authenticated server/trainer context)
 app.post("/api/auth/trainer/send-credential", async (req, res) => {
   try {
     const { email, trainerName, trainerCode } = req.body || {};
@@ -412,7 +395,11 @@ app.post("/api/auth/verify-code", async (req, res) => {
 
     const result = await verificationService.verifyCode(email, code);
     if (!result.success) {
-      return res.status(400).json(result);
+      return res.status(result.status || 400).json({
+        success: false,
+        error: result.error,
+        message: result.message,
+      });
     }
 
     return res.json({
@@ -429,53 +416,55 @@ app.post("/api/auth/verify-code", async (req, res) => {
 // Password Reset: Request code
 app.post("/api/auth/forgot-password/send-code", async (req, res) => {
   try {
-    const { email, code: customCode } = req.body || {};
+    const { email } = req.body || {};
     if (!email || !email.trim()) {
       return res.status(400).json({ success: false, error: "Ingresa tu correo electrónico." });
     }
 
     const cleanEmail = email.trim().toLowerCase();
+    const clientIp = (
+      (req.headers["x-forwarded-for"] as string)?.split(",")[0] ||
+      req.ip ||
+      req.socket.remoteAddress ||
+      ""
+    ).trim();
 
-    // If client supplied code to register
-    if (customCode && typeof customCode === "string" && customCode.trim().length === 6) {
-      verificationService.registerCode(cleanEmail, customCode.trim(), "password_reset");
-      // Dispatch via SendGrid as well without blocking HTTP response
-      emailService.sendVerificationEmail(cleanEmail, customCode.trim(), "password_reset").then((res) => {
-        console.log(`[SendGrid Direct] Password reset email dispatched to ${cleanEmail}:`, res);
-      }).catch((e) =>
-        console.warn("[EmailService] Background password reset dispatch note:", e?.message)
-      );
-      return res.json({
-        success: true,
-        code: customCode.trim(),
-        message: `Código de recuperación registrado para ${cleanEmail}.`,
+    // Check rate limits & cooldown (60s cooldown, max 5/hr per email & IP)
+    const rateCheck = verificationService.checkRateLimits(cleanEmail, clientIp);
+    if (!rateCheck.allowed) {
+      return res.status(rateCheck.status || 429).json({
+        success: false,
+        error: rateCheck.error,
+        message: rateCheck.message,
       });
     }
 
-    const result = await verificationService.generateAndSendCode(cleanEmail, "password_reset");
-    if (!result.success) {
-      return res.status(400).json(result);
+    // Check if account exists in database
+    const userExists = !!serverDatabase.findUserByEmail(cleanEmail);
+
+    if (userExists) {
+      const result = await verificationService.generateAndSendCode(cleanEmail, "password_reset", clientIp);
+      if (!result.success) {
+        return res.status(result.status || 500).json({
+          success: false,
+          error: result.error,
+          message: result.message,
+        });
+      }
+    } else {
+      // Record rate limit consumption even for non-existent emails to prevent enumeration abuse
+      verificationService.recordSend(cleanEmail, clientIp);
     }
 
+    // Security: Response is 100% IDENTICAL whether the email exists or not to prevent account enumeration
     return res.json({
       success: true,
-      code: result.code,
-      message: `Código de recuperación enviado a ${cleanEmail}. Revisa tu bandeja de entrada o spam.`,
+      message: `Si la cuenta ${cleanEmail} está registrada en Sportfitness, recibirás un código de recuperación de 6 dígitos. Revisa tu bandeja de entrada o spam.`,
     });
   } catch (error: any) {
     console.error("forgot-password send-code error:", error);
     return res.status(500).json({ success: false, error: "Error al solicitar código de recuperación." });
   }
-});
-
-// Endpoint for checking latest verification code in case of mail delivery delay or spam filtering
-app.get("/api/auth/verification-code-hint", (req, res) => {
-  const email = (req.query.email as string || "").trim().toLowerCase();
-  const code = verificationService.getLatestCode(email);
-  if (!code) {
-    return res.status(404).json({ success: false, error: "No hay código activo." });
-  }
-  return res.json({ success: true, code });
 });
 
 // Password Reset: Verify code

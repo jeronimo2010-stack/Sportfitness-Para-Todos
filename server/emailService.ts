@@ -140,7 +140,7 @@ Has solicitado un código de verificación para ${purposeText} en Sportfitness.
 
 Tu código de verificación de 6 dígitos es: ${code}
 
-Este código es de uso único y expirará en exactamente 5 minutos.
+Este código es de uso único y expirará en exactamente 10 minutos.
 Si tú no realizaste esta solicitud, puedes ignorar este mensaje con total tranquilidad.
 
 Equipo de Seguridad Sportfitness
@@ -187,7 +187,7 @@ Equipo de Seguridad Sportfitness
                   ${code}
                 </div>
                 <div style="font-size: 12px; color: #a0a0b0; margin-top: 8px;">
-                  ⏱️ Válido durante <strong>5 minutos</strong>
+                  ⏱️ Válido durante <strong>10 minutos</strong>
                 </div>
               </div>
             </td>
@@ -197,7 +197,7 @@ Equipo de Seguridad Sportfitness
             <td style="font-size: 13px; line-height: 20px; color: #9a9ab0; padding-bottom: 24px; border-top: 1px solid #20202e; padding-top: 20px;">
               • <strong>Uso único:</strong> Este código se invalida inmediatamente tras ser utilizado.<br>
               • <strong>Confidencial:</strong> No compartas este código con nadie.<br>
-              • <strong>Expiración:</strong> Tras 5 minutos deberás solicitar un código nuevo.<br>
+              • <strong>Expiración:</strong> Tras 10 minutos deberás solicitar un código nuevo.<br>
               • Si tú no solicitaste este código, ignora este mensaje con seguridad.
             </td>
           </tr>
@@ -246,7 +246,7 @@ Equipo de Seguridad Sportfitness
     console.log(`\n======================================================`);
     console.log(`[EMAIL DISPATCH] Email to: ${cleanTo}`);
     console.log(`Subject: ${subject}`);
-    console.log(`Verification Code: ${code} (Expires in 5 minutes)`);
+    console.log(`Verification Code: ${code} (Expires in 10 minutes)`);
     console.log(`======================================================\n`);
 
     return {

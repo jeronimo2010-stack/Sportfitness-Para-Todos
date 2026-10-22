@@ -34,10 +34,11 @@ if (typeof window !== 'undefined') {
 }
 
 /**
- * Saves a document to the 'mail' collection to trigger SendGrid dispatch via Firebase Extension.
- * Enforces the verified Single Sender identity: sportfitness112@gmail.com
+ * DEPRECATED FOR CLIENT USE - Security Hardened.
+ * All emails and verification codes are generated and dispatched strictly server-side
+ * via VerificationService and SendGrid API. Clients are prohibited from writing to the 'mail' collection.
  */
-export async function queueEmailInFirestore(params: {
+export async function queueEmailInFirestore(_params: {
   to: string | string[];
   subject: string;
   text: string;
@@ -47,70 +48,9 @@ export async function queueEmailInFirestore(params: {
   phone?: string;
   type?: 'contact_form' | 'verification_code' | 'password_reset' | 'notification' | 'trainer_credential';
   metadata?: Record<string, any>;
-}) {
-  const recipients = Array.isArray(params.to) ? params.to : [params.to];
-  const fromEmail = 'sportfitness112@gmail.com';
-  const fromName = params.senderName || 'Sportfitness';
-  const replyToEmail = 'mateobedoy20@gmail.com';
-
-  const mailDoc = {
-    to: recipients,
-    from: fromEmail,
-    replyTo: replyToEmail,
-    message: {
-      from: `${fromName} <${fromEmail}>`,
-      replyTo: replyToEmail,
-      subject: params.subject,
-      text: params.text,
-      html: params.html || `<div style="font-family: sans-serif; padding: 16px;">${params.text.replace(/\n/g, '<br/>')}</div>`,
-    },
-    senderName: fromName,
-    senderEmail: fromEmail,
-    phone: params.phone || '',
-    type: params.type || 'verification_code',
-    metadata: params.metadata || {},
-    createdAt: new Date().toISOString(),
-    timestamp: serverTimestamp(),
-  };
-
-  // 1. Dual dispatch: SendGrid direct via /api/send-email (works on Vercel Serverless & Express dev server)
-  try {
-    fetch('/api/send-email', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        to: recipients,
-        subject: params.subject,
-        text: params.text,
-        html: mailDoc.message.html,
-        senderName: fromName,
-        replyTo: replyToEmail,
-      }),
-    })
-      .then(async (res) => {
-        if (res.ok) {
-          console.log('[Email Dispatch] SendGrid direct dispatch succeeded via /api/send-email');
-        }
-      })
-      .catch((apiErr) => {
-        console.warn('[Email Dispatch] /api/send-email note:', apiErr?.message);
-      });
-  } catch {}
-
-  // 2. Queue into Firestore 'mail' collection (Firebase Trigger Email extension)
-  try {
-    const addDocPromise = addDoc(collection(db, 'mail'), mailDoc);
-    const timeoutPromise = new Promise<{ id: string }>((resolve) => {
-      setTimeout(() => resolve({ id: 'queued-in-firestore-stream' }), 2500);
-    });
-
-    const docRef = await Promise.race([addDocPromise, timeoutPromise]);
-    console.log(`[Firestore Mail] Document queued for 'mail' collection with ID: ${docRef.id}`);
-    return { success: true, docId: docRef.id };
-  } catch (err: any) {
-    console.warn(`[Firestore Mail] Firestore write notice (handled):`, err?.message || err);
-    return { success: true, docId: 'dispatched-via-api-fallback' };
-  }
+}): Promise<{ success: boolean; docId: string }> {
+  // Security: Client writes to 'mail' collection are disabled to prevent storing codes or leaking HTML in Firestore.
+  return { success: true, docId: 'disabled_by_security_policy' };
 }
 
 // Critical constraint: Validate Firestore connection on boot

@@ -210,6 +210,7 @@ export const TrainerRegisterView: React.FC<TrainerRegisterViewProps> = ({
   const [inputCode, setInputCode] = useState('');
   const [isVerifyingEmail, setIsVerifyingEmail] = useState(false);
   const [emailVerified, setEmailVerified] = useState(false);
+  const [verificationToken, setVerificationToken] = useState<string>('');
   const [codeNotification, setCodeNotification] = useState<string | null>(null);
   const [assignedTrainerCode, setAssignedTrainerCode] = useState<string | null>(null);
   const [resendTimer, setResendTimer] = useState(0);
@@ -262,6 +263,9 @@ export const TrainerRegisterView: React.FC<TrainerRegisterViewProps> = ({
       const res = await authService.verifyCode(email.trim(), inputCode.trim());
       if (res.success) {
         setEmailVerified(true);
+        if (res.verificationToken) {
+          setVerificationToken(res.verificationToken);
+        }
         setIsVerifyingEmail(false);
         setCodeNotification(null);
         changeStep(2);
@@ -284,6 +288,7 @@ export const TrainerRegisterView: React.FC<TrainerRegisterViewProps> = ({
     setIsVerifyingEmail(false);
     setEmailVerified(false);
     setInputCode('');
+    setVerificationToken('');
     setCodeNotification(null);
   };
 
@@ -454,6 +459,7 @@ export const TrainerRegisterView: React.FC<TrainerRegisterViewProps> = ({
         height: heightNum,
         clothingSize: sizeVal,
         bodyType: bodyVal,
+        verificationToken,
       });
 
       const coachName = `Coach ${cleanFirstName} ${cleanLastName}`.trim();

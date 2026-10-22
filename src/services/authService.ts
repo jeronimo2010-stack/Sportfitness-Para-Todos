@@ -30,6 +30,7 @@ export interface RegisterPayload {
   height: number;
   clothingSize: ClothingSize;
   bodyType?: BodyType;
+  verificationToken?: string;
 }
 
 class AuthService {
@@ -68,11 +69,10 @@ class AuthService {
   /**
    * Register a new user
    * ATOMIC TRANSACTION:
-   * 1. Creates authentic user in Firebase Authentication.
-   * 2. Writes complete profile document in Firestore (AWAITED).
-   *    If Firestore fails, performs automatic rollback (deletes auth user).
-   * 3. Synchronizes with server and local storage.
-   * 4. Guarantees 100% consistency across devices.
+   * 1. Requires valid verificationToken consumed on server (/api/auth/register).
+   * 2. Creates authentic user in Firebase Authentication.
+   * 3. Writes complete profile document in Firestore.
+   * 4. Synchronizes with local storage.
    */
   public async register(payload: RegisterPayload): Promise<AuthResponse> {
     const cleanEmail = payload.email.trim().toLowerCase();
@@ -103,7 +103,7 @@ class AuthService {
     let userId = `usr-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`;
     let serverToken = `sf_token_${userId}`;
 
-    // STEP 1: Registro en servidor (/api/auth/register)
+    // STEP 1: Registro en servidor con verificación previa obligatoria (/api/auth/register)
     try {
       const srvRes = await fetch('/api/auth/register', {
         method: 'POST',
@@ -118,36 +118,52 @@ class AuthService {
           firstName: cleanFirstName,
           lastName: cleanLastName,
           role: assignedRole,
+          verificationToken: payload.verificationToken,
         }),
       });
       const srvData = await srvRes.json().catch(() => null);
+
+      if (!srvRes.ok || !srvData?.success) {
+        if (srvData?.alreadyRegistered) {
+          const local = localDatabase.findUserByEmail(cleanEmail);
+          if (local) {
+            local.weight = Number(payload.weight) || local.weight;
+            local.height = Number(payload.height) || local.height;
+            local.clothingSize = payload.clothingSize || local.clothingSize;
+            local.bodyType = payload.bodyType || local.bodyType;
+            localDatabase.saveUser(local);
+            localDatabase.setActiveUserId(local.id);
+            const tok = `sf_token_${local.id}`;
+            try {
+              localStorage.setItem('sportfitness_session_token', tok);
+              sessionStorage.setItem('sportfitness_session_token', tok);
+            } catch {}
+            return {
+              success: true,
+              user: local,
+              token: tok,
+              message: 'Cuenta existente reconocida. Métricas actualizadas con éxito.',
+            };
+          }
+        }
+        return {
+          success: false,
+          error: srvData?.error || 'Error al registrar usuario',
+          message: srvData?.message || srvData?.error || 'No se pudo completar el registro. Verifica tu correo y código.',
+        };
+      }
+
       if (srvData?.success && srvData?.user) {
         if (srvData.user.id) userId = srvData.user.id;
         if (srvData.token) serverToken = srvData.token;
-      } else if (srvData?.alreadyRegistered) {
-        const local = localDatabase.findUserByEmail(cleanEmail);
-        if (local) {
-          local.weight = Number(payload.weight) || local.weight;
-          local.height = Number(payload.height) || local.height;
-          local.clothingSize = payload.clothingSize || local.clothingSize;
-          local.bodyType = payload.bodyType || local.bodyType;
-          localDatabase.saveUser(local);
-          localDatabase.setActiveUserId(local.id);
-          const tok = `sf_token_${local.id}`;
-          try {
-            localStorage.setItem('sportfitness_session_token', tok);
-            sessionStorage.setItem('sportfitness_session_token', tok);
-          } catch {}
-          return {
-            success: true,
-            user: local,
-            token: tok,
-            message: 'Cuenta existente reconocida. Métricas actualizadas con éxito.',
-          };
-        }
       }
-    } catch (srvErr) {
-      console.warn('[Backend] /api/auth/register notice:', srvErr);
+    } catch (srvErr: any) {
+      console.warn('[Backend] /api/auth/register network note:', srvErr);
+      return {
+        success: false,
+        error: 'Error de conexión',
+        message: 'No se pudo conectar con el servidor de autenticación para validar el registro.',
+      };
     }
 
     // STEP 2: Sincronización resiliente con Firebase (sin bloquear el registro ante fallos de red)
@@ -456,143 +472,48 @@ class AuthService {
   }
 
   /**
-   * Send 6-digit email verification code via Firestore 'mail' collection (Trigger Email extension)
+   * Request 6-digit email verification code.
+   * Generated exclusively on the server using cryptographically secure random integers.
+   * Codes are never generated on or transmitted to the client.
    */
   public async sendVerificationCode(
     email: string,
     purpose: string = 'registro'
   ): Promise<{ success: boolean; message: string; error?: string }> {
     const cleanEmail = email.trim().toLowerCase();
-    
-    // Always generate a distinct code from all previous codes
-    let usedCodes: string[] = [];
-    try {
-      const stored = sessionStorage.getItem(`used_verification_codes_${cleanEmail}`);
-      if (stored) usedCodes = JSON.parse(stored);
-    } catch {}
 
-    let code = '';
-    let loopCount = 0;
-    do {
-      code = Math.floor(100000 + Math.random() * 900000).toString();
-      loopCount++;
-    } while (usedCodes.includes(code) && loopCount < 50);
-
-    usedCodes.push(code);
-    if (usedCodes.length > 20) usedCodes = usedCodes.slice(-20);
     try {
-      sessionStorage.setItem(`used_verification_codes_${cleanEmail}`, JSON.stringify(usedCodes));
-      sessionStorage.setItem(`verification_code_${cleanEmail}`, code);
-    } catch {}
-
-    // 2. Register code with backend server
-    try {
-      await fetch('/api/auth/send-verification-code', {
+      const response = await fetch('/api/auth/send-verification-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: cleanEmail, purpose, code }),
+        body: JSON.stringify({ email: cleanEmail, purpose }),
       });
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok || !data?.success) {
+        return {
+          success: false,
+          error: data?.error || 'send_failed',
+          message: data?.message || 'No se pudo despachar el código de verificación.',
+        };
+      }
+
+      return {
+        success: true,
+        message: data.message || `Código enviado exitosamente a ${cleanEmail}. Revisa tu bandeja de entrada o spam.`,
+      };
     } catch (err: any) {
-      console.warn('Backend send-verification-code sync note:', err);
+      return {
+        success: false,
+        error: 'network_error',
+        message: 'Error al conectar con el servidor para despachar el código de verificación.',
+      };
     }
-
-    const purposeTitle =
-      purpose === 'register_trainer'
-        ? 'Registro de Entrenador Oficial'
-        : purpose === 'register_athlete'
-        ? 'Registro de Atleta'
-        : 'Verificación de Cuenta';
-
-    const subject = `Código de verificación Sportfitness: ${code}`;
-    const textContent = `
-Hola,
-
-Recibimos una solicitud para ${purposeTitle} en Sportfitness asociada a tu correo: ${cleanEmail}.
-
-Tu código de verificación de 6 dígitos es: ${code}
-
-Este código es de un solo uso y expirará en exactamente 5 minutos.
-Si tú no realizaste esta solicitud, puedes ignorar este mensaje con seguridad.
-
-Equipo de Seguridad Sportfitness
-    `.trim();
-
-    const htmlContent = `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>Código de Verificación - Sportfitness</title>
-</head>
-<body style="margin: 0; padding: 20px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0b0c10; color: #e0e0e0;">
-  <div style="max-width: 520px; margin: 0 auto; background-color: #121218; border: 1px solid #2a2a38; border-radius: 16px; overflow: hidden; padding: 32px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
-    <div style="text-align: center; padding-bottom: 24px;">
-      <div style="font-size: 24px; font-weight: 800; letter-spacing: 2px; color: #56A867; text-transform: uppercase;">
-        SPORTFITNESS
-      </div>
-      <div style="font-size: 11px; letter-spacing: 1.5px; color: #888899; text-transform: uppercase; margin-top: 4px;">
-        ${purposeTitle}
-      </div>
-    </div>
-    <div style="font-size: 14px; line-height: 22px; color: #d0d0dc; padding-bottom: 24px;">
-      Hola,<br><br>
-      Recibimos una solicitud para <strong>${purposeTitle}</strong> en la plataforma Sportfitness asociada a tu dirección de correo: <strong>${cleanEmail}</strong>.
-    </div>
-    <div style="text-align: center; padding: 10px 0 28px 0;">
-      <div style="background-color: #181824; border: 2px dashed #56A867; border-radius: 12px; padding: 20px 28px; display: inline-block;">
-        <div style="font-size: 11px; font-weight: 600; letter-spacing: 1px; color: #888899; text-transform: uppercase; margin-bottom: 8px;">
-          Tu Código de Verificación Único
-        </div>
-        <div style="font-size: 38px; font-weight: 800; letter-spacing: 8px; color: #56A867; font-family: 'Courier New', Courier, monospace;">
-          ${code}
-        </div>
-        <div style="font-size: 12px; color: #a0a0b0; margin-top: 8px;">
-          ⏱️ Válido durante <strong>5 minutos</strong>
-        </div>
-      </div>
-    </div>
-    <div style="font-size: 12px; line-height: 18px; color: #9a9ab0; padding-bottom: 20px; border-top: 1px solid #20202e; padding-top: 20px;">
-      • <strong>Uso único:</strong> Este código se invalida inmediatamente tras ser utilizado.<br>
-      • <strong>Confidencial:</strong> No compartas este código con nadie.<br>
-      • Si tú no solicitaste este código, puedes ignorar este mensaje de forma segura.
-    </div>
-    <div style="text-align: center; font-size: 11px; color: #666677; border-top: 1px solid #1a1a24; padding-top: 16px;">
-      © ${new Date().getFullYear()} Sportfitness Platform. Todos los derechos reservados.
-    </div>
-  </div>
-</body>
-</html>
-    `.trim();
-
-    // 3. WRITE TO FIRESTORE 'mail' COLLECTION (Trigger Email extension)
-    // Runs concurrently so network stream handshake never hangs the UI
-    queueEmailInFirestore({
-      to: cleanEmail,
-      subject,
-      text: textContent,
-      html: htmlContent,
-      senderName: 'Sportfitness Verificación',
-      senderEmail: 'sportfitness112@gmail.com',
-      type: 'verification_code',
-      metadata: {
-        purpose,
-        code,
-        sentAt: new Date().toISOString(),
-      },
-    }).then(result => {
-      console.log(`[Firestore Mail] Verification code document processed with ID:`, result.docId);
-    }).catch(fsErr => {
-      console.warn(`[Firestore Mail] Firestore notice (safe):`, fsErr);
-    });
-
-    return {
-      success: true,
-      message: `Código de verificación de 6 dígitos enviado exitosamente a ${cleanEmail}. Revisa tu bandeja de entrada o carpeta de spam.`,
-    };
   }
 
   /**
-   * Verify 6-digit email verification code
+   * Verify 6-digit email verification code against server SHA-256 hash.
+   * Rate limited to maximum 5 failed attempts per code.
    */
   public async verifyCode(
     email: string,
@@ -601,7 +522,6 @@ Equipo de Seguridad Sportfitness
     const cleanEmail = email.trim().toLowerCase();
     const cleanCode = code.replace(/\D/g, '').trim();
 
-    // 1. Try server verification first
     try {
       const response = await fetch('/api/auth/verify-code', {
         method: 'POST',
@@ -609,6 +529,7 @@ Equipo de Seguridad Sportfitness
         body: JSON.stringify({ email: cleanEmail, code: cleanCode }),
       });
       const data = await response.json().catch(() => null);
+
       if (response.ok && data?.success) {
         return {
           success: true,
@@ -616,170 +537,70 @@ Equipo de Seguridad Sportfitness
           verificationToken: data.verificationToken,
         };
       }
-    } catch (err: any) {
-      console.warn('Backend verify-code fetch note:', err);
-    }
-
-    // 2. Reliable Local & Session Storage Fallback Check
-    const localCode = sessionStorage.getItem(`verification_code_${cleanEmail}`);
-    if (localCode && localCode.replace(/\D/g, '').trim() === cleanCode) {
-      sessionStorage.removeItem(`verification_code_${cleanEmail}`);
-      // Register with server quietly so backend recognizes verification
-      fetch('/api/auth/send-verification-code', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: cleanEmail, code: cleanCode }),
-      }).catch(() => {});
 
       return {
-        success: true,
-        message: 'Código verificado correctamente.',
-        verificationToken: `vtok_local_${Date.now()}`,
+        success: false,
+        error: data?.error || 'verification_failed',
+        message: data?.message || 'El código de 6 dígitos ingresado es incorrecto o ha expirado.',
+      };
+    } catch (err: any) {
+      return {
+        success: false,
+        error: 'network_error',
+        message: 'Error de red al conectar con el servidor para validar el código.',
       };
     }
-
-    return {
-      success: false,
-      error: 'Código incorrecto',
-      message: 'El código de 6 dígitos ingresado es incorrecto o ha expirado. Por favor verifica tu correo.',
-    };
   }
 
   /**
-   * Send 6-digit password recovery code via Firestore 'mail' collection (Trigger Email extension)
+   * Request password recovery 6-digit code.
+   * Generated exclusively on the server and sent via SendGrid.
+   * Returns identical success message whether the account exists or not to prevent user enumeration.
    */
   public async sendForgotPasswordCode(
     email: string
   ): Promise<{ success: boolean; message: string; error?: string }> {
     const cleanEmail = email.trim().toLowerCase();
 
-    // Always generate a distinct code from all previous codes
-    let usedCodes: string[] = [];
     try {
-      const stored = sessionStorage.getItem(`used_recovery_codes_${cleanEmail}`);
-      if (stored) usedCodes = JSON.parse(stored);
-    } catch {}
-
-    let code = '';
-    let loopCount = 0;
-    do {
-      code = Math.floor(100000 + Math.random() * 900000).toString();
-      loopCount++;
-    } while (usedCodes.includes(code) && loopCount < 50);
-
-    usedCodes.push(code);
-    if (usedCodes.length > 20) usedCodes = usedCodes.slice(-20);
-    try {
-      sessionStorage.setItem(`used_recovery_codes_${cleanEmail}`, JSON.stringify(usedCodes));
-      sessionStorage.setItem(`recovery_code_${cleanEmail}`, code);
-    } catch {}
-
-    // 2. Register code with backend server
-    try {
-      await fetch('/api/auth/forgot-password/send-code', {
+      const response = await fetch('/api/auth/forgot-password/send-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: cleanEmail, code }),
+        body: JSON.stringify({ email: cleanEmail }),
       });
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok || !data?.success) {
+        return {
+          success: false,
+          error: data?.error || 'request_failed',
+          message: data?.message || 'No se pudo procesar la solicitud de recuperación.',
+        };
+      }
+
+      return {
+        success: true,
+        message: data.message || `Si la cuenta está registrada, recibirás un código de 6 dígitos.`,
+      };
     } catch (err: any) {
-      console.warn('Backend forgot-password fetch note:', err);
+      return {
+        success: false,
+        error: 'network_error',
+        message: 'Error de red al solicitar el código de recuperación.',
+      };
     }
-
-    const subject = `Código de recuperación Sportfitness: ${code}`;
-    const textContent = `
-Hola,
-
-Recibimos una solicitud para restablecer la contraseña de tu cuenta Sportfitness (${cleanEmail}).
-
-Tu código de recuperación de 6 dígitos es: ${code}
-
-Este código tiene una validez de 5 minutos.
-Si tú no realizaste esta solicitud, puedes ignorar este mensaje; tu contraseña actual no será modificada.
-
-Equipo de Seguridad Sportfitness
-    `.trim();
-
-    const htmlContent = `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>Recuperación de Contraseña - Sportfitness</title>
-</head>
-<body style="margin: 0; padding: 20px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0b0c10; color: #e0e0e0;">
-  <div style="max-width: 520px; margin: 0 auto; background-color: #121218; border: 1px solid #2a2a38; border-radius: 16px; overflow: hidden; padding: 32px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
-    <div style="text-align: center; padding-bottom: 24px;">
-      <div style="font-size: 24px; font-weight: 800; letter-spacing: 2px; color: #56A867; text-transform: uppercase;">
-        SPORTFITNESS
-      </div>
-      <div style="font-size: 11px; letter-spacing: 1.5px; color: #888899; text-transform: uppercase; margin-top: 4px;">
-        Recuperación de Contraseña
-      </div>
-    </div>
-    <div style="font-size: 14px; line-height: 22px; color: #d0d0dc; padding-bottom: 24px;">
-      Hola,<br><br>
-      Recibimos una solicitud para restablecer la contraseña de acceso a tu cuenta en <strong>Sportfitness</strong> asociada al correo: <strong>${cleanEmail}</strong>.
-    </div>
-    <div style="text-align: center; padding: 10px 0 28px 0;">
-      <div style="background-color: #181824; border: 2px dashed #56A867; border-radius: 12px; padding: 20px 28px; display: inline-block;">
-        <div style="font-size: 11px; font-weight: 600; letter-spacing: 1px; color: #888899; text-transform: uppercase; margin-bottom: 8px;">
-          Tu Código de Recuperación Único
-        </div>
-        <div style="font-size: 38px; font-weight: 800; letter-spacing: 8px; color: #56A867; font-family: 'Courier New', Courier, monospace;">
-          ${code}
-        </div>
-        <div style="font-size: 12px; color: #a0a0b0; margin-top: 8px;">
-          ⏱️ Válido durante <strong>5 minutos</strong>
-        </div>
-      </div>
-    </div>
-    <div style="font-size: 12px; line-height: 18px; color: #9a9ab0; padding-bottom: 20px; border-top: 1px solid #20202e; padding-top: 20px;">
-      • Ingresa este código de 6 dígitos en la ventana de recuperación para definir una contraseña nueva.<br>
-      • Si tú no solicitaste este cambio, puedes ignorar este correo; tu cuenta permanece 100% segura.
-    </div>
-    <div style="text-align: center; font-size: 11px; color: #666677; border-top: 1px solid #1a1a24; padding-top: 16px;">
-      © ${new Date().getFullYear()} Sportfitness Platform. Todos los derechos reservados.
-    </div>
-  </div>
-</body>
-</html>
-    `.trim();
-
-    // 3. WRITE TO FIRESTORE 'mail' COLLECTION (Trigger Email extension)
-    // Non-blocking concurrent execution so client network stream never hangs the UI
-    queueEmailInFirestore({
-      to: cleanEmail,
-      subject,
-      text: textContent,
-      html: htmlContent,
-      senderName: 'Sportfitness Seguridad',
-      senderEmail: 'sportfitness112@gmail.com',
-      type: 'password_reset',
-      metadata: {
-        code,
-        sentAt: new Date().toISOString(),
-      },
-    }).then(result => {
-      console.log(`[Firestore Mail] Password reset document processed with ID:`, result.docId);
-    }).catch(fsErr => {
-      console.warn(`[Firestore Mail] Firestore notice (safe):`, fsErr);
-    });
-
-    return {
-      success: true,
-      message: `Código de recuperación enviado a ${cleanEmail}. Revisa tu bandeja de entrada o spam.`,
-    };
   }
 
   /**
-   * Verify 6-digit password recovery code
+   * Verify 6-digit password recovery code.
    */
   public async verifyForgotPasswordCode(
     email: string,
     code: string
   ): Promise<{ success: boolean; message: string; error?: string; verificationToken?: string }> {
     const cleanEmail = email.trim().toLowerCase();
-    const cleanCode = code.trim();
+    const cleanCode = code.replace(/\D/g, '').trim();
+
     try {
       const response = await fetch('/api/auth/forgot-password/verify-code', {
         method: 'POST',
@@ -787,6 +608,7 @@ Equipo de Seguridad Sportfitness
         body: JSON.stringify({ email: cleanEmail, code: cleanCode }),
       });
       const data = await response.json().catch(() => null);
+
       if (response.ok && data?.success) {
         return {
           success: true,
@@ -794,51 +616,19 @@ Equipo de Seguridad Sportfitness
           verificationToken: data.verificationToken,
         };
       }
-      if (data && !data.success) {
-        return {
-          success: false,
-          error: data.error || 'Código incorrecto',
-          message: data.message || data.error || 'El código es incorrecto o ya ha sido utilizado.',
-        };
-      }
-    } catch (err: any) {
-      console.warn('Backend verify-forgot-password fetch note:', err);
-    }
 
-    const localCode = sessionStorage.getItem(`recovery_code_${cleanEmail}`);
-    if (localCode && localCode === cleanCode) {
-      sessionStorage.removeItem(`recovery_code_${cleanEmail}`);
       return {
-        success: true,
-        message: 'Código verificado correctamente.',
-        verificationToken: `vtok_local_${Date.now()}`,
+        success: false,
+        error: data?.error || 'Código incorrecto',
+        message: data?.message || 'El código es incorrecto o ya ha sido utilizado.',
+      };
+    } catch (err: any) {
+      return {
+        success: false,
+        error: 'network_error',
+        message: 'Error de red al validar el código de recuperación.',
       };
     }
-
-    return {
-      success: false,
-      error: 'Código incorrecto',
-      message: 'El código es incorrecto o ya ha sido utilizado.',
-    };
-  }
-
-  /**
-   * Retrieves active code hint if user encounters mail delivery delay or spam filtering
-   */
-  public async getVerificationHint(email: string): Promise<string | null> {
-    const cleanEmail = email.trim().toLowerCase();
-    try {
-      const response = await fetch(`/api/auth/verification-code-hint?email=${encodeURIComponent(cleanEmail)}`);
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success && data.code) return data.code;
-      }
-    } catch {}
-    return (
-      sessionStorage.getItem(`verification_code_${cleanEmail}`) ||
-      sessionStorage.getItem(`recovery_code_${cleanEmail}`) ||
-      null
-    );
   }
 
   /**

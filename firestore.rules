@@ -64,11 +64,9 @@ service cloud.firestore {
       allow update, delete: if isAdmin() && isValidId(ticketId);
     }
 
-    // Mail collection for SendGrid / Firebase Trigger Email extension
+    // Mail collection: Strictly prohibited from all client reads and writes
     match /mail/{mailId} {
-      allow create: if request.resource.data.to != null;
-      allow read: if isAdmin();
-      allow update, delete: if isAdmin();
+      allow read, write: if false;
     }
 
     // Admins Collection

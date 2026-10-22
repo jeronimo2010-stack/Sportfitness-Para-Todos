@@ -139,6 +139,7 @@ export const AthleteRegisterView: React.FC<AthleteRegisterViewProps> = ({
   const [isSendingCode, setIsSendingCode] = useState(false);
   const [inputCode, setInputCode] = useState('');
   const [emailVerified, setEmailVerified] = useState(false);
+  const [verificationToken, setVerificationToken] = useState<string>('');
   const [codeNotification, setCodeNotification] = useState<string | null>(null);
 
   const [selectedCountry, setSelectedCountry] = useState(COUNTRIES[0]);
@@ -327,6 +328,9 @@ export const AthleteRegisterView: React.FC<AthleteRegisterViewProps> = ({
       const res = await authService.verifyCode(email.trim(), inputCode.trim());
       if (res.success) {
         setEmailVerified(true);
+        if (res.verificationToken) {
+          setVerificationToken(res.verificationToken);
+        }
         setIsVerifyingEmail(false);
         setCodeNotification(null);
         changeStep(2);
@@ -349,25 +353,8 @@ export const AthleteRegisterView: React.FC<AthleteRegisterViewProps> = ({
     setIsVerifyingEmail(false);
     setEmailVerified(false);
     setInputCode('');
+    setVerificationToken('');
     setCodeNotification(null);
-  };
-
-  const handleAutofillCode = async () => {
-    try {
-      const hint = await authService.getVerificationHint(email.trim());
-      if (hint && hint.length === 6) {
-        setInputCode(hint);
-        setErrorMessage('');
-      } else {
-        setErrorMessage(
-          language === 'es'
-            ? 'Aún no se ha generado un código o el servidor está procesando el envío.'
-            : 'No code found yet. Please click Resend.'
-        );
-      }
-    } catch {
-      setErrorMessage('No se pudo autocompletar el código.');
-    }
   };
 
   const handleStep2Complete = (e: React.FormEvent) => {
@@ -478,6 +465,7 @@ export const AthleteRegisterView: React.FC<AthleteRegisterViewProps> = ({
         height: heightNum,
         clothingSize: sizeVal,
         bodyType: bodyVal,
+        verificationToken,
       });
 
       if (res.success && res.user) {

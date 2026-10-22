@@ -393,7 +393,7 @@ export const ForgotPasswordModal: React.FC = () => {
                   {timer > 0 ? (
                     `⏱️ ${t('pwdResendPin')} ${timer} ${t('pwdSeconds')}`
                   ) : (
-                    <span className="text-emerald-500 font-semibold">{language === 'en' ? 'Code expired' : 'Código expirado'}</span>
+                    <span className="text-emerald-500 font-semibold">{language === 'en' ? 'Cooldown complete' : 'Puedes solicitar un nuevo código'}</span>
                   )}
                 </span>
 

@@ -1,13 +1,12 @@
 import crypto from 'crypto';
 import { emailService } from './emailService';
-import { db, verificarCodigo } from './db';
 
 export interface VerificationRecord {
   email: string;
-  code: string;
-  expiresAt: number; // millisecond timestamp
+  codeHash: string;
+  expiresAt: number; // millisecond timestamp (10 minutes)
   used: boolean;
-  attempts: number;
+  failedAttempts: number; // maximum 5 attempts allowed
   purpose: string;
   createdAt: number;
 }
@@ -20,13 +19,39 @@ export interface VerificationTokenRecord {
   createdAt: number;
 }
 
+interface RateLimitRecord {
+  lastSent: number;
+  sendTimestamps: number[];
+}
+
 class VerificationService {
   private codes: Map<string, VerificationRecord> = new Map();
   private verifiedTokens: Map<string, VerificationTokenRecord> = new Map();
-  private usedCodesHistory: Map<string, Set<string>> = new Map();
+  private emailRateLimits: Map<string, RateLimitRecord> = new Map();
+  private ipRateLimits: Map<string, RateLimitRecord> = new Map();
 
   // Email format regular expression
   private emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
+
+  private get pepper(): string {
+    return (
+      process.env.SECURITY_PEPPER ||
+      process.env.SESSION_SECRET ||
+      'sf_secure_pepper_2026_sportfitness_auth_hash'
+    ).trim();
+  }
+
+  /**
+   * Generates a deterministic SHA-256 hash using the 6-digit code, the target email, and a server-side pepper.
+   */
+  public hashCode(code: string, email: string): string {
+    const cleanCode = (code || '').trim();
+    const cleanEmail = (email || '').trim().toLowerCase();
+    return crypto
+      .createHash('sha256')
+      .update(`${cleanCode}:${cleanEmail}:${this.pepper}`)
+      .digest('hex');
+  }
 
   public isValidEmail(email: string): boolean {
     if (!email || typeof email !== 'string') return false;
@@ -36,137 +61,166 @@ class VerificationService {
   }
 
   /**
-   * Generates a secure 6-digit numeric verification code, stores it temporarily in the backend,
-   * sets 5-minute expiration, and dispatches it strictly to the user's provided email.
-   * SECURITY: The generated code is NEVER returned in the API response or sent to the client.
+   * Rate limiting and cooldown checks:
+   * 1. 60-second cooldown per email
+   * 2. Max 5 sends per hour per email
+   * 3. Max 5 sends per hour per client IP
+   */
+  public checkRateLimits(
+    email: string,
+    ip: string
+  ): { allowed: boolean; status?: number; error?: string; message?: string } {
+    const cleanEmail = (email || '').trim().toLowerCase();
+    const cleanIp = (ip || 'unknown').trim();
+    const now = Date.now();
+    const ONE_HOUR = 60 * 60 * 1000;
+    const COOLDOWN = 60 * 1000; // 60 seconds
+
+    // 1. Email checks
+    const emailRecord = this.emailRateLimits.get(cleanEmail);
+    if (emailRecord) {
+      if (now - emailRecord.lastSent < COOLDOWN) {
+        const remainingSec = Math.ceil((COOLDOWN - (now - emailRecord.lastSent)) / 1000);
+        return {
+          allowed: false,
+          status: 429,
+          error: 'cooldown_active',
+          message: `Por favor espera ${remainingSec} segundos antes de solicitar otro código para este correo.`,
+        };
+      }
+
+      const recentEmailSends = emailRecord.sendTimestamps.filter((ts) => now - ts < ONE_HOUR);
+      if (recentEmailSends.length >= 5) {
+        return {
+          allowed: false,
+          status: 429,
+          error: 'hourly_limit_reached',
+          message: 'Has alcanzado el límite de 5 envíos por hora para este correo. Por favor intenta más tarde.',
+        };
+      }
+    }
+
+    // 2. IP checks
+    const ipRecord = this.ipRateLimits.get(cleanIp);
+    if (ipRecord) {
+      const recentIpSends = ipRecord.sendTimestamps.filter((ts) => now - ts < ONE_HOUR);
+      if (recentIpSends.length >= 5) {
+        return {
+          allowed: false,
+          status: 429,
+          error: 'ip_limit_reached',
+          message: 'Has alcanzado el límite de 5 envíos por hora desde tu conexión. Por favor intenta más tarde.',
+        };
+      }
+    }
+
+    return { allowed: true };
+  }
+
+  /**
+   * Records a successful code dispatch for rate limiting
+   */
+  public recordSend(email: string, ip: string): void {
+    const cleanEmail = (email || '').trim().toLowerCase();
+    const cleanIp = (ip || 'unknown').trim();
+    const now = Date.now();
+    const ONE_HOUR = 60 * 60 * 1000;
+
+    // Update email record
+    const emailRecord = this.emailRateLimits.get(cleanEmail) || { lastSent: 0, sendTimestamps: [] };
+    const filteredEmail = emailRecord.sendTimestamps.filter((ts) => now - ts < ONE_HOUR);
+    filteredEmail.push(now);
+    this.emailRateLimits.set(cleanEmail, { lastSent: now, sendTimestamps: filteredEmail });
+
+    // Update IP record
+    const ipRecord = this.ipRateLimits.get(cleanIp) || { lastSent: 0, sendTimestamps: [] };
+    const filteredIp = ipRecord.sendTimestamps.filter((ts) => now - ts < ONE_HOUR);
+    filteredIp.push(now);
+    this.ipRateLimits.set(cleanIp, { lastSent: now, sendTimestamps: filteredIp });
+  }
+
+  /**
+   * Generates a cryptographically random 6-digit numeric code with leading zeros,
+   * sends it via SendGrid, and stores ONLY its SHA-256 hash in server memory.
+   * Expiration: exactly 10 minutes.
+   * Single-use only.
    */
   public async generateAndSendCode(
     email: string,
-    purpose: string = 'general'
-  ): Promise<{ success: boolean; error?: string; message: string; expiresInSeconds?: number; code?: string }> {
+    purpose: string = 'general',
+    ip: string = ''
+  ): Promise<{ success: boolean; status?: number; error?: string; message: string }> {
     const cleanEmail = (email || '').trim().toLowerCase();
 
     // 1. Validate email format
     if (!this.isValidEmail(cleanEmail)) {
       return {
         success: false,
+        status: 400,
         error: 'invalid_format',
-        message: 'El correo electrónico ingresado no tiene un formato válido (ejemplo: usuario@dominio.com).',
+        message: 'El correo electrónico ingresado no tiene un formato válido.',
       };
     }
 
-    // 2. Generate cryptographically random 6-digit numeric code strictly distinct from prior codes
-    const history = this.usedCodesHistory.get(cleanEmail) || new Set<string>();
-    const prevRecord = this.codes.get(cleanEmail);
-    let numericCode = crypto.randomInt(100000, 1000000).toString();
-    let attempts = 0;
-    while ((history.has(numericCode) || (prevRecord && prevRecord.code === numericCode)) && attempts < 50) {
-      numericCode = crypto.randomInt(100000, 1000000).toString();
-      attempts++;
+    // 2. Rate limiting check
+    const rateCheck = this.checkRateLimits(cleanEmail, ip);
+    if (!rateCheck.allowed) {
+      return {
+        success: false,
+        status: rateCheck.status || 429,
+        error: rateCheck.error,
+        message: rateCheck.message || 'Límite de solicitudes superado.',
+      };
     }
-    history.add(numericCode);
-    if (history.size > 50) {
-      const first = history.values().next().value;
-      if (first) history.delete(first);
-    }
-    this.usedCodesHistory.set(cleanEmail, history);
 
-    // 3. Expiration time: 15 minutes (900,000 ms) for generous mail delivery window
-    const EXPIRATION_MS = 15 * 60 * 1000;
-    const now = Date.now();
-    const expiresAt = now + EXPIRATION_MS;
+    // 3. Generate 6-digit code with leading zeros (000000 - 999999)
+    const numericCode = crypto.randomInt(0, 1000000).toString().padStart(6, '0');
 
-    // 4. Send email strictly to the user's provided email
+    // 4. Send email strictly to the destination email via SendGrid
     const emailResult = await emailService.sendVerificationEmail(cleanEmail, numericCode, purpose);
-
     if (!emailResult.success) {
       return {
         success: false,
+        status: 502,
         error: 'send_failed',
-        message: emailResult.error || 'No se pudo enviar el correo de verificación. Por favor verifica la dirección e inténtalo más tarde.',
+        message: 'No se pudo enviar el correo de verificación. Por favor verifica la dirección e inténtalo más tarde.',
       };
     }
 
-    // 5. Store record on server (overwrites any previous unverified code for this email)
+    // 5. Compute SHA-256 hash with pepper - NEVER store raw code
+    const codeHash = this.hashCode(numericCode, cleanEmail);
+    const now = Date.now();
+    const EXPIRATION_MS = 10 * 60 * 1000; // exactly 10 minutes
+
     const record: VerificationRecord = {
       email: cleanEmail,
-      code: numericCode,
-      expiresAt,
+      codeHash,
+      expiresAt: now + EXPIRATION_MS,
       used: false,
-      attempts: 0,
+      failedAttempts: 0,
       purpose,
       createdAt: now,
     };
-    this.codes.set(cleanEmail, record);
 
-    // Also persist token into db.tokens
-    try {
-      await db.tokens.create({
-        email: cleanEmail,
-        code: numericCode,
-        expires_at: new Date(expiresAt).toISOString(),
-        is_used: false,
-        purpose,
-      });
-    } catch (tokErr) {
-      console.warn('Notice saving token to db.tokens:', tokErr);
-    }
+    this.codes.set(cleanEmail, record);
+    this.recordSend(cleanEmail, ip);
 
     return {
       success: true,
-      code: numericCode,
-      message: `Código de verificación de 6 dígitos enviado exitosamente a ${cleanEmail}. Revisa tu bandeja de entrada o carpeta de spam.`,
-      expiresInSeconds: 900,
+      message: `Código de verificación de 6 dígitos enviado exitosamente a ${cleanEmail}. Revisa tu bandeja de entrada o spam.`,
     };
   }
 
   /**
-   * Registers a verification code created by the system/client for validation
-   */
-  public registerCode(
-    email: string,
-    code: string,
-    purpose: string = 'general'
-  ): { success: boolean; message: string } {
-    const cleanEmail = (email || '').trim().toLowerCase();
-    const cleanCode = (code || '').replace(/\D/g, '').trim();
-    if (!this.isValidEmail(cleanEmail)) {
-      return { success: false, message: 'Correo inválido' };
-    }
-    const history = this.usedCodesHistory.get(cleanEmail) || new Set<string>();
-    history.add(cleanCode);
-    this.usedCodesHistory.set(cleanEmail, history);
-
-    const record: VerificationRecord = {
-      email: cleanEmail,
-      code: cleanCode,
-      expiresAt: Date.now() + 15 * 60 * 1000,
-      used: false,
-      attempts: 0,
-      purpose,
-      createdAt: Date.now(),
-    };
-    this.codes.set(cleanEmail, record);
-
-    // Also persist in db.tokens
-    db.tokens.create({
-      email: cleanEmail,
-      code: cleanCode,
-      expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
-      is_used: false,
-      purpose,
-    }).catch((e) => console.warn('Error saving registered token to db:', e));
-
-    return { success: true, message: 'Código registrado en el servidor' };
-  }
-
-  /**
-   * Validates the 6-digit code entered by the user using verificarCodigo
+   * Validates the 6-digit code against the stored SHA-256 hash.
+   * Limits: Maximum 5 failed attempts per code before permanent invalidation.
+   * Expiration: 10 minutes.
+   * Single-use: marks code as used immediately and issues a verificationToken.
    */
   public async verifyCode(
     email: string,
     inputCode: string
-  ): Promise<{ success: boolean; error?: string; message: string; verificationToken?: string }> {
+  ): Promise<{ success: boolean; status?: number; error?: string; message: string; verificationToken?: string }> {
     const cleanEmail = (email || '').trim().toLowerCase();
     const cleanCode = (inputCode || '').replace(/\D/g, '').trim();
 
@@ -174,107 +228,119 @@ class VerificationService {
     if (!this.isValidEmail(cleanEmail)) {
       return {
         success: false,
+        status: 400,
         error: 'invalid_format',
         message: 'El formato del correo electrónico es inválido.',
       };
     }
 
-    // 2. Code format check
+    // 2. Code format check (must be exactly 6 digits)
     if (!cleanCode || cleanCode.length !== 6 || !/^\d{6}$/.test(cleanCode)) {
       return {
         success: false,
+        status: 400,
         error: 'invalid_code',
         message: 'Por favor ingresa los 6 dígitos numéricos del código recibido.',
       };
     }
 
-    // Check in-memory record first (fast and robust)
-    const memoryRecord = this.codes.get(cleanEmail);
+    const record = this.codes.get(cleanEmail);
     const now = Date.now();
-    const memoryValid = memoryRecord && !memoryRecord.used && memoryRecord.code === cleanCode && now <= memoryRecord.expiresAt;
 
-    if (memoryValid) {
-      memoryRecord.used = true;
-      // Mark as used in db.tokens as well if present
-      db.tokens.findOne({ where: { email: cleanEmail, code: cleanCode, is_used: false } })
-        .then((tok) => {
-          if (tok) db.tokens.update({ is_used: true }, { where: { id: tok.id } });
-        })
-        .catch(() => {});
-
-      const verificationToken = `vtok_${crypto.randomBytes(24).toString('hex')}`;
-      this.verifiedTokens.set(verificationToken, {
-        token: verificationToken,
-        email: cleanEmail,
-        purpose: memoryRecord.purpose || 'general',
-        expiresAt: Date.now() + 15 * 60 * 1000,
-        createdAt: Date.now(),
-      });
-
-      return {
-        success: true,
-        message: 'Código verificado correctamente.',
-        verificationToken,
-      };
-    }
-
-    // Try persistent db.tokens check
-    try {
-      const verif = await verificarCodigo(cleanEmail, cleanCode);
-      if (memoryRecord) {
-        memoryRecord.used = true;
-      }
-
-      const verificationToken = `vtok_${crypto.randomBytes(24).toString('hex')}`;
-      this.verifiedTokens.set(verificationToken, {
-        token: verificationToken,
-        email: cleanEmail,
-        purpose: memoryRecord?.purpose || 'general',
-        expiresAt: Date.now() + 15 * 60 * 1000,
-        createdAt: Date.now(),
-      });
-
-      return {
-        success: true,
-        message: verif.message,
-        verificationToken,
-      };
-    } catch (dbErr: any) {
+    if (!record || record.used) {
       return {
         success: false,
-        error: 'verification_failed',
-        message: dbErr.message || 'El código es incorrecto o ya ha sido utilizado.',
+        status: 400,
+        error: 'invalid_or_used',
+        message: 'El código es incorrecto o ya ha sido utilizado.',
       };
     }
+
+    // Check expiration (10 minutes)
+    if (now > record.expiresAt) {
+      record.used = true;
+      return {
+        success: false,
+        status: 400,
+        error: 'expired_code',
+        message: 'El código ha expirado (validez de 10 minutos). Por favor solicita uno nuevo.',
+      };
+    }
+
+    // Check failed attempts limit (max 5)
+    if (record.failedAttempts >= 5) {
+      record.used = true;
+      return {
+        success: false,
+        status: 403,
+        error: 'max_attempts_exceeded',
+        message: 'Has superado el máximo de 5 intentos fallidos. Este código ha sido invalidado por seguridad. Solicita uno nuevo.',
+      };
+    }
+
+    // Hash user's input and compare
+    const inputHash = this.hashCode(cleanCode, cleanEmail);
+    if (inputHash !== record.codeHash) {
+      record.failedAttempts++;
+      const remaining = 5 - record.failedAttempts;
+
+      if (record.failedAttempts >= 5) {
+        record.used = true;
+        return {
+          success: false,
+          status: 403,
+          error: 'max_attempts_exceeded',
+          message: 'Has superado el máximo de 5 intentos fallidos. El código ha sido invalidado.',
+        };
+      }
+
+      return {
+        success: false,
+        status: 400,
+        error: 'incorrect_code',
+        message: `El código ingresado es incorrecto. Te quedan ${remaining} ${remaining === 1 ? 'intento' : 'intentos'}.`,
+      };
+    }
+
+    // Code is valid! Mark as used immediately (single-use)
+    record.used = true;
+
+    // Issue cryptographically secure single-use verificationToken (valid 10 minutes)
+    const verificationToken = `vtok_${crypto.randomBytes(32).toString('hex')}`;
+    this.verifiedTokens.set(verificationToken, {
+      token: verificationToken,
+      email: cleanEmail,
+      purpose: record.purpose || 'general',
+      expiresAt: now + 10 * 60 * 1000,
+      createdAt: now,
+    });
+
+    return {
+      success: true,
+      message: 'Código verificado correctamente.',
+      verificationToken,
+    };
   }
 
   /**
-   * Consumes a verification token for actions such as password reset
+   * Consumes a verification token for sensitive operations (register, password reset).
+   * Validates target email, expiration, and ensures single-use by immediately deleting the token.
    */
   public consumeVerificationToken(token: string, email: string): boolean {
+    if (!token || typeof token !== 'string') return false;
     const cleanEmail = (email || '').trim().toLowerCase();
     const tokenRecord = this.verifiedTokens.get(token);
+
     if (!tokenRecord) return false;
     if (tokenRecord.email !== cleanEmail) return false;
     if (Date.now() > tokenRecord.expiresAt) {
       this.verifiedTokens.delete(token);
       return false;
     }
-    // Delete after single use
+
+    // Single-use: delete immediately
     this.verifiedTokens.delete(token);
     return true;
-  }
-
-  /**
-   * Retrieves active code for user in case of email delivery delay or test environment
-   */
-  public getLatestCode(email: string): string | null {
-    const cleanEmail = (email || '').trim().toLowerCase();
-    const record = this.codes.get(cleanEmail);
-    if (!record || record.used || Date.now() > record.expiresAt) {
-      return null;
-    }
-    return record.code;
   }
 }
 
