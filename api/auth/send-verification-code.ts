@@ -5,11 +5,10 @@
 
 import { db } from '../../server/db';
 
-const SENDGRID_API_KEY =
-  process.env.SENDGRID_API_KEY || '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';
-const SENDGRID_FROM_EMAIL = process.env.SENDGRID_FROM_EMAIL || 'sportfitness112@gmail.com';
-const SENDGRID_FROM_NAME = process.env.SENDGRID_FROM_NAME || 'Sportfitness';
-const SENDGRID_REPLY_TO = process.env.SENDGRID_REPLY_TO || 'mateobedoy20@gmail.com';
+const SENDGRID_API_KEY = (process.env.SENDGRID_API_KEY || '').trim();
+const SENDGRID_FROM_EMAIL = (process.env.SENDGRID_FROM_EMAIL || 'sportfitness112@gmail.com').trim();
+const SENDGRID_FROM_NAME = (process.env.SENDGRID_FROM_NAME || 'Sportfitness').trim();
+const SENDGRID_REPLY_TO = (process.env.SENDGRID_REPLY_TO || 'mateobedoy20@gmail.com').trim();
 
 export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Credentials', 'true');

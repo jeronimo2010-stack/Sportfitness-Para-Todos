@@ -102,9 +102,19 @@ class VerificationService {
       }
     }
 
-    // 2. IP checks (exempt loopback/localhost in preview to avoid collective lockout)
-    const isLocalIp = cleanIp === '::1' || cleanIp === '127.0.0.1' || cleanIp === '::ffff:127.0.0.1' || cleanIp === 'localhost' || cleanIp === 'unknown';
-    if (!isLocalIp) {
+    // 2. IP checks:
+    // Exemption for loopback/localhost ONLY when NODE_ENV !== 'production'
+    const isProduction = process.env.NODE_ENV === 'production';
+    const isLoopback =
+      cleanIp === '::1' ||
+      cleanIp === '127.0.0.1' ||
+      cleanIp === '::ffff:127.0.0.1' ||
+      cleanIp === 'localhost';
+    const shouldExemptIp = !isProduction && isLoopback;
+
+    // In production or for non-loopback IPs: enforce IP rate limit.
+    // Do NOT pool "unknown" or empty IPs into a shared bucket to avoid blocking unrelated clients.
+    if (!shouldExemptIp && cleanIp && cleanIp !== 'unknown') {
       const ipRecord = this.ipRateLimits.get(cleanIp);
       if (ipRecord) {
         const recentIpSends = ipRecord.sendTimestamps.filter((ts) => now - ts < ONE_HOUR);
@@ -128,7 +138,7 @@ class VerificationService {
    */
   public recordSend(email: string, ip: string): void {
     const cleanEmail = (email || '').trim().toLowerCase();
-    const cleanIp = (ip || 'unknown').trim();
+    const cleanIp = (ip || '').trim();
     const now = Date.now();
     const ONE_HOUR = 60 * 60 * 1000;
 
@@ -138,11 +148,21 @@ class VerificationService {
     filteredEmail.push(now);
     this.emailRateLimits.set(cleanEmail, { lastSent: now, sendTimestamps: filteredEmail });
 
-    // Update IP record
-    const ipRecord = this.ipRateLimits.get(cleanIp) || { lastSent: 0, sendTimestamps: [] };
-    const filteredIp = ipRecord.sendTimestamps.filter((ts) => now - ts < ONE_HOUR);
-    filteredIp.push(now);
-    this.ipRateLimits.set(cleanIp, { lastSent: now, sendTimestamps: filteredIp });
+    // Update IP record: only track valid, identifiable IPs (never group as "unknown")
+    const isProduction = process.env.NODE_ENV === 'production';
+    const isLoopback =
+      cleanIp === '::1' ||
+      cleanIp === '127.0.0.1' ||
+      cleanIp === '::ffff:127.0.0.1' ||
+      cleanIp === 'localhost';
+    const shouldExemptIp = !isProduction && isLoopback;
+
+    if (!shouldExemptIp && cleanIp && cleanIp !== 'unknown') {
+      const ipRecord = this.ipRateLimits.get(cleanIp) || { lastSent: 0, sendTimestamps: [] };
+      const filteredIp = ipRecord.sendTimestamps.filter((ts) => now - ts < ONE_HOUR);
+      filteredIp.push(now);
+      this.ipRateLimits.set(cleanIp, { lastSent: now, sendTimestamps: filteredIp });
+    }
   }
 
   /**

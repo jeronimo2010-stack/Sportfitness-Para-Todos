@@ -9,6 +9,18 @@ import { emailService, maskEmail } from "./server/emailService";
 import { verificationService } from "./server/verificationService";
 
 const app = express();
+app.set("trust proxy", true);
+
+function getClientIp(req: express.Request): string {
+  const forwarded = req.headers["x-forwarded-for"];
+  if (typeof forwarded === "string" && forwarded.trim()) {
+    return forwarded.split(",")[0].trim();
+  }
+  if (Array.isArray(forwarded) && forwarded.length > 0) {
+    return forwarded[0].trim();
+  }
+  return (req.ip || req.socket.remoteAddress || "").trim();
+}
 
 function parsePort(): number {
   const portArgIndex = process.argv.indexOf("--port");
@@ -26,6 +38,15 @@ function parsePort(): number {
 const PORT = parsePort();
 
 app.use(express.json());
+
+// Prohibit direct client email relaying (to/subject/html)
+app.all("/api/send-email", (req, res) => {
+  return res.status(403).json({
+    success: false,
+    error: "Security Policy Violation",
+    message: "Direct client email relaying (to/subject/html) is prohibited. All emails must be dispatched through dedicated server endpoints with server-generated codes.",
+  });
+});
 
 // API Health Check
 app.get("/api/health", (req, res) => {
@@ -326,12 +347,7 @@ app.post("/api/auth/send-verification-code", async (req, res) => {
   try {
     const { email, purpose = "registro" } = req.body || {};
     const masked = maskEmail(email || "");
-    const clientIp = (
-      (req.headers["x-forwarded-for"] as string)?.split(",")[0] ||
-      req.ip ||
-      req.socket.remoteAddress ||
-      ""
-    ).trim();
+    const clientIp = getClientIp(req);
 
     console.log(`[DIAG] [ROUTE /send-verification-code] Petición POST recibida | Email: ${masked} | Purpose: ${purpose} | IP: ${clientIp || 'unknown'}`);
 
@@ -436,12 +452,7 @@ app.post("/api/auth/forgot-password/send-code", async (req, res) => {
   try {
     const { email } = req.body || {};
     const masked = maskEmail(email || "");
-    const clientIp = (
-      (req.headers["x-forwarded-for"] as string)?.split(",")[0] ||
-      req.ip ||
-      req.socket.remoteAddress ||
-      ""
-    ).trim();
+    const clientIp = getClientIp(req);
 
     console.log(`[DIAG] [ROUTE /forgot-password/send-code] Petición POST recibida | Email: ${masked} | IP: ${clientIp || 'unknown'}`);
 
@@ -463,27 +474,36 @@ app.post("/api/auth/forgot-password/send-code", async (req, res) => {
       });
     }
 
-    // Check if account exists in database for diagnostics
-    const userInServerDb = !!serverDatabase.findUserByEmail(cleanEmail);
-    console.log(`[DIAG] [ROUTE /forgot-password/send-code] Verificación en base de datos local: inServerDb=${userInServerDb} para ${masked}`);
+    // Check if account exists in authoritative database (data/sportfitness_database.json)
+    const userInDb = serverDatabase.findUserByEmail(cleanEmail);
+    console.log(`[DIAG] [ROUTE /forgot-password/send-code] Verificación en base de datos: exists=${!!userInDb} para ${masked}`);
 
-    // Unified dispatch: ALWAYS call generateAndSendCode with await, ensuring SendGrid is invoked
-    console.log(`[DIAG] [ROUTE /forgot-password/send-code] Invocando verificationService.generateAndSendCode (purpose: password_reset) para ${masked}...`);
-    const result = await verificationService.generateAndSendCode(cleanEmail, "password_reset", clientIp);
+    if (userInDb) {
+      // User exists: dispatch recovery code via SendGrid
+      console.log(`[DIAG] [ROUTE /forgot-password/send-code] Cuenta confirmada. Invocando generateAndSendCode (password_reset) para ${masked}...`);
+      const result = await verificationService.generateAndSendCode(cleanEmail, "password_reset", clientIp);
 
-    if (!result.success) {
-      console.error(`[DIAG] [ROUTE /forgot-password/send-code] ERROR al despachar código para ${masked}: ${result.error}`);
-      return res.status(result.status || 502).json({
-        success: false,
-        error: result.error || 'send_failed',
-        message: result.message || 'No se pudo enviar el correo de recuperación. Revisa la configuración del proveedor de correo.',
-      });
+      if (!result.success) {
+        console.error(`[DIAG] [ROUTE /forgot-password/send-code] ERROR SendGrid al despachar código para ${masked}: ${result.error}`);
+        // Return 502 with error message that does NOT reveal whether account exists
+        return res.status(502).json({
+          success: false,
+          error: "send_failed",
+          message: "Ocurrió un error en el servicio de correo al procesar tu solicitud. Por favor intenta más tarde.",
+        });
+      }
+    } else {
+      // User does NOT exist: do NOT call SendGrid, record rate limit attempt and simulate matching dispatch latency
+      console.log(`[DIAG] [ROUTE /forgot-password/send-code] Cuenta inexistente para ${masked}. Omitiendo SendGrid y simulando latencia uniforme.`);
+      verificationService.recordSend(cleanEmail, clientIp);
+      await new Promise((resolve) => setTimeout(resolve, 450));
     }
 
-    console.log(`[DIAG] [ROUTE /forgot-password/send-code] ÉXITO: Correo de recuperación despachado satisfactoriamente para ${masked}`);
+    // Security: Response is 100% IDENTICAL whether the email exists or not to prevent account enumeration
+    console.log(`[DIAG] [ROUTE /forgot-password/send-code] Respuesta uniforme devuelta para ${masked}`);
     return res.json({
       success: true,
-      message: `Código de recuperación de 6 dígitos enviado a ${cleanEmail}. Revisa tu bandeja de entrada o spam.`,
+      message: `Si la cuenta ${cleanEmail} está registrada en Sportfitness, recibirás un código de recuperación de 6 dígitos. Revisa tu bandeja de entrada o spam.`,
     });
   } catch (error: any) {
     console.error("[DIAG] [ROUTE /forgot-password/send-code] Excepción no controlada:", error);
