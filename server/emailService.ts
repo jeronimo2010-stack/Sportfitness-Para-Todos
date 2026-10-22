@@ -8,6 +8,17 @@ export interface EmailSendResult {
   simulated?: boolean;
 }
 
+export function maskEmail(email: string): string {
+  if (!email || typeof email !== 'string') return '***';
+  const clean = email.trim().toLowerCase();
+  const parts = clean.split('@');
+  if (parts.length !== 2) return '***';
+  const user = parts[0];
+  const domain = parts[1];
+  const maskedUser = user.length <= 2 ? `${user[0]}***` : `${user[0]}***${user[user.length - 1]}`;
+  return `${maskedUser}@${domain}`;
+}
+
 class EmailService {
   private transporter: Transporter | null = null;
   private isConfigured: boolean = false;
@@ -65,6 +76,19 @@ class EmailService {
     htmlContent: string
   ): Promise<EmailSendResult> {
     const cleanTo = toEmail.trim().toLowerCase();
+    const masked = maskEmail(cleanTo);
+    const key = this.sendGridApiKey;
+    const hasKey = Boolean(key && key.length > 10);
+    const keyPrefix = hasKey ? key.substring(0, 7) + '...' : 'NONE';
+    const keyLen = key ? key.length : 0;
+
+    console.log(`[DIAG] [SENDGRID] Petición de despacho iniciada | Destino: ${masked} | Asunto: "${subject}" | API Key presente: ${hasKey} (prefix: ${keyPrefix}, len: ${keyLen}) | From: ${this.sendGridFromEmail} | ReplyTo: ${this.sendGridReplyTo}`);
+
+    if (!hasKey) {
+      console.error(`[DIAG] [SENDGRID] ERROR: SENDGRID_API_KEY no está configurada o está vacía en las variables de entorno.`);
+      return { success: false, error: 'SENDGRID_API_KEY no configurada en el servidor' };
+    }
+
     try {
       const payload = {
         personalizations: [{ to: [{ email: cleanTo }] }],
@@ -77,37 +101,38 @@ class EmailService {
         ],
       };
 
+      console.log(`[DIAG] [SENDGRID] Enviando payload HTTP POST a https://api.sendgrid.com/v3/mail/send para ${masked}...`);
+
       const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${this.sendGridApiKey}`,
+          Authorization: `Bearer ${key}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(payload),
       });
 
+      console.log(`[DIAG] [SENDGRID] Respuesta HTTP recibida de SendGrid | Status: ${response.status} ${response.statusText} para ${masked}`);
+
       if (response.status >= 200 && response.status < 300) {
         const messageId = response.headers.get('x-message-id') || `sg-${Date.now()}`;
-        const recipientDomain = cleanTo.split('@')[1] || 'domain';
-        console.log(`[EmailService] SendGrid accepted message (status ${response.status}, ID: ${messageId}) for domain: @${recipientDomain}`);
+        console.log(`[DIAG] [SENDGRID] ÉXITO: Mensaje aceptado por SendGrid API (Status ${response.status}) | ID: ${messageId} | Destino: ${masked}`);
         return { success: true, messageId };
       } else {
         const errText = await response.text();
-        const recipientDomain = cleanTo.split('@')[1] || 'domain';
-        console.warn(`[EmailService] SendGrid rejected message (status ${response.status}) for domain @${recipientDomain}:`, errText);
+        console.error(`[DIAG] [SENDGRID] ERROR: SendGrid rechazó el envío (Status HTTP ${response.status}) para ${masked} | Detalle/Cuerpo del error: ${errText}`);
         let userFriendlyError = `SendGrid error (${response.status})`;
         if (response.status === 401) {
-          userFriendlyError = 'SendGrid: API Key no autorizada o inválida (401)';
+          userFriendlyError = 'SendGrid: API Key no autorizada o revocada (401). Verifica tu clave en SendGrid.';
         } else if (response.status === 403) {
-          userFriendlyError = 'SendGrid: Acceso denegado o remitente no verificado (403)';
+          userFriendlyError = 'SendGrid: Acceso denegado o remitente no verificado (403). Verifica Sender Authentication.';
         } else if (response.status === 429) {
-          userFriendlyError = 'SendGrid: Límite de tasa de envío alcanzado (429)';
+          userFriendlyError = 'SendGrid: Límite de tasa de envío superado (429).';
         }
-        return { success: false, error: `${userFriendlyError}: ${errText}` };
+        return { success: false, error: `${userFriendlyError} - ${errText}` };
       }
     } catch (err: any) {
-      const recipientDomain = cleanTo.split('@')[1] || 'domain';
-      console.error(`[EmailService] Network failure connecting to SendGrid for domain @${recipientDomain}:`, err?.message || err);
+      console.error(`[DIAG] [SENDGRID] ERROR de conexión de red al conectar con api.sendgrid.com para ${masked}:`, err?.message || err);
       return { success: false, error: err?.message || 'Error de red al conectar con SendGrid' };
     }
   }
@@ -237,24 +262,25 @@ Equipo de Seguridad Sportfitness
     `.trim();
 
     // 1. Primary: Send via SendGrid
+    const masked = maskEmail(cleanTo);
+    console.log(`[DIAG] [EMAIL-SVC] Solicitud de verificación procesando para ${masked} | Propósito: ${purpose} | Código (longitud: ${code.length})`);
+
     if (this.sendGridApiKey) {
-      const recipientDomain = cleanTo.split('@')[1] || 'domain';
-      console.log(`[EmailService] Stage: Dispatching verification email via SendGrid to domain @${recipientDomain} (Purpose: ${purpose})`);
+      console.log(`[DIAG] [EMAIL-SVC] Despachando a sendViaSendGrid para ${masked}...`);
       const sgResult = await this.sendViaSendGrid(cleanTo, subject, textContent, htmlContent);
       if (sgResult.success) {
-        console.log(`[EmailService] Stage: SendGrid accepted message for @${recipientDomain} (MessageId: ${sgResult.messageId})`);
+        console.log(`[DIAG] [EMAIL-SVC] SendGrid completó con éxito el envío a ${masked}. ID: ${sgResult.messageId}`);
         return sgResult;
       }
-      console.warn(`[EmailService] Stage: SendGrid dispatch failed for @${recipientDomain}: ${sgResult.error}`);
+      console.warn(`[DIAG] [EMAIL-SVC] SendGrid no pudo entregar el correo a ${masked}. Error: ${sgResult.error}`);
     } else {
-      console.warn('[EmailService] Stage: SENDGRID_API_KEY is not configured in environment.');
+      console.warn(`[DIAG] [EMAIL-SVC] SENDGRID_API_KEY no configurada en variables de entorno.`);
     }
 
     // 2. Secondary: If real SMTP transporter is configured, use it directly!
     if (this.transporter) {
-      const recipientDomain = cleanTo.split('@')[1] || 'domain';
       try {
-        console.log(`[EmailService] Stage: Attempting fallback verification dispatch via SMTP to @${recipientDomain}`);
+        console.log(`[DIAG] [EMAIL-SVC] Intentando fallback mediante SMTP para ${masked}`);
         const info = await this.transporter.sendMail({
           from: fromAddress,
           to: cleanTo,
@@ -263,16 +289,15 @@ Equipo de Seguridad Sportfitness
           html: htmlContent,
         });
 
-        console.log(`[EmailService] Stage: Verification email successfully delivered via SMTP to @${recipientDomain}. MessageId: ${info.messageId}`);
+        console.log(`[DIAG] [EMAIL-SVC] Correo entregado exitosamente vía SMTP para ${masked}. ID: ${info.messageId}`);
         return { success: true, messageId: info.messageId };
       } catch (err: any) {
-        console.error(`[EmailService] Stage: SMTP dispatch failed for @${recipientDomain}:`, err?.message || err);
+        console.error(`[DIAG] [EMAIL-SVC] Fallback SMTP falló para ${masked}:`, err?.message || err);
       }
     }
 
     // 3. Provider failure: do NOT disguise failure as success
-    const recipientDomain = cleanTo.split('@')[1] || 'domain';
-    console.error(`[EmailService] Stage: Dispatch failed. No email provider was able to deliver to @${recipientDomain}.`);
+    console.error(`[DIAG] [EMAIL-SVC] Fallo total de despacho. Ningún proveedor de correo pudo enviar el código a ${masked}.`);
     return {
       success: false,
       error: 'No se pudo enviar el correo de verificación a través de SendGrid ni SMTP. Verifica la configuración del proveedor.',

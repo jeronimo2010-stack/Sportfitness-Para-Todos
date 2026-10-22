@@ -218,6 +218,192 @@ export const AthleteDashboardView: React.FC<AthleteDashboardViewProps> = ({
     });
   }, [isZeroState, workoutLogs, language]);
 
+  // Dynamic progressive overload logic (aumento progresivo basado en sesiones y microciclos)
+  const progressiveOverloadFactor = useMemo(() => {
+    if (isZeroState) return 1.0;
+    const sessions = progressRecord?.sessionsCompleted || 0;
+    const blocks = Math.floor(sessions / 3);
+    // Incrementa un 2.5% de sobrecarga cada 3 entrenamientos completados con éxito (hasta un +20% por mesociclo)
+    return 1 + Math.min(0.20, blocks * 0.025);
+  }, [isZeroState, progressRecord?.sessionsCompleted]);
+
+  // Peso sugerido para hoy (Peso Objetivo Diario de la Sesión)
+  const suggestedExerciseToday = useMemo(() => {
+    const todayIndex = (new Date().getDay() + 6) % 7; // 0 = Lunes, 6 = Domingo
+    const w = user.weight || 75;
+
+    const baseSquat = squatLoad || 60;
+    const baseLegPress = legPressLoad || 100;
+    const baseRdl = rdlLoad || 70;
+    const baseStarter = starterExercise.suggestedWeightKg || 40;
+
+    const dailySchedule = [
+      { name: 'Sentadilla Trasera con Barra', base: baseSquat, reps: '4 × 8', muscle: 'Cuádriceps & Glúteo' },
+      { name: 'Press de Banca Plano', base: Math.round(w * 0.75), reps: '4 × 8', muscle: 'Pectoral Mayor & Tríceps' },
+      { name: 'Peso Muerto Rumano', base: baseRdl, reps: '3 × 10', muscle: 'Cadena Posterior & Isquios' },
+      { name: 'Press Militar Estricto', base: Math.round(w * 0.50), reps: '4 × 8', muscle: 'Deltoides & Estabilidad' },
+      { name: 'Prensa de Piernas 45°', base: baseLegPress, reps: '3 × 10', muscle: 'Tren Inferior & Glúteos' },
+      { name: 'Remo con Barra Prono', base: Math.round(w * 0.70), reps: '4 × 10', muscle: 'Dorsal & Espalda Media' },
+      { name: 'Calibración Funcional & Core', base: baseStarter, reps: '3 × 12', muscle: 'Core & Readaptación' },
+    ];
+
+    const todayEx = dailySchedule[todayIndex] || dailySchedule[0];
+    const targetWeightKg = Math.round(todayEx.base * progressiveOverloadFactor);
+    const overloadIncrementKg = Math.max(0, targetWeightKg - todayEx.base);
+    const overloadPercent = Math.round((progressiveOverloadFactor - 1) * 100 * 10) / 10;
+
+    return {
+      exerciseName: todayEx.name,
+      targetWeightKg: isZeroState ? todayEx.base : targetWeightKg,
+      baseWeightKg: todayEx.base,
+      reps: todayEx.reps,
+      muscle: todayEx.muscle,
+      overloadPercent: isZeroState ? 0 : overloadPercent,
+      overloadIncrementKg: isZeroState ? 0 : overloadIncrementKg,
+    };
+  }, [squatLoad, legPressLoad, rdlLoad, starterExercise, progressiveOverloadFactor, user.weight, isZeroState]);
+
+  // Tabla 1: Control de Fuerza & Estimación 1RM (Fuerza Máxima y Cargas Efectivas)
+  const strengthTableData = useMemo(() => {
+    const w = user.weight || 75;
+
+    const baseExercises = [
+      {
+        id: 'squat',
+        name: 'Sentadilla Trasera con Barra',
+        targetMuscle: 'Cuádriceps & Glúteo Mayor',
+        baseWorkingKg: Math.round(w * 0.95),
+        sets: 4,
+        reps: 8,
+        rpeTarget: 'RPE 8.0 (2 RIR)',
+        weeklyOverload: '+2.5% (+2.0 kg/sem)',
+      },
+      {
+        id: 'bench',
+        name: 'Press de Banca Plano',
+        targetMuscle: 'Pectoral Mayor & Tríceps',
+        baseWorkingKg: Math.round(w * 0.75),
+        sets: 4,
+        reps: 8,
+        rpeTarget: 'RPE 8.5 (1.5 RIR)',
+        weeklyOverload: '+2.5% (+1.5 kg/sem)',
+      },
+      {
+        id: 'rdl',
+        name: 'Peso Muerto Rumano (RDL)',
+        targetMuscle: 'Isquiosurales & Glúteos',
+        baseWorkingKg: Math.round(w * 1.05),
+        sets: 3,
+        reps: 10,
+        rpeTarget: 'RPE 7.5 (2.5 RIR)',
+        weeklyOverload: '+2.5% (+2.5 kg/sem)',
+      },
+      {
+        id: 'ohp',
+        name: 'Press Militar Estricto',
+        targetMuscle: 'Deltoides Medial & Core',
+        baseWorkingKg: Math.round(w * 0.50),
+        sets: 4,
+        reps: 8,
+        rpeTarget: 'RPE 8.0 (2 RIR)',
+        weeklyOverload: '+2.5% (+1.0 kg/sem)',
+      },
+      {
+        id: 'row',
+        name: 'Remo con Barra Prono',
+        targetMuscle: 'Dorsal Ancho & Romboides',
+        baseWorkingKg: Math.round(w * 0.70),
+        sets: 4,
+        reps: 10,
+        rpeTarget: 'RPE 8.0 (2 RIR)',
+        weeklyOverload: '+2.5% (+1.5 kg/sem)',
+      },
+    ];
+
+    return baseExercises.map((ex) => {
+      const workingWeightKg = isZeroState ? ex.baseWorkingKg : Math.round(ex.baseWorkingKg * progressiveOverloadFactor);
+      // 1RM Brzycki formula: weight / (1.0278 - 0.0278 * reps)
+      const estimatedOneRmKg = Math.round(workingWeightKg / (1.0278 - 0.0278 * ex.reps));
+      return {
+        ...ex,
+        workingWeightKg,
+        estimatedOneRmKg,
+      };
+    });
+  }, [user.weight, progressiveOverloadFactor, isZeroState]);
+
+  // Tabla 2: Registro de Progresión de Sobrecarga Dinámica (Semana a Semana)
+  const progressiveOverloadCycle = useMemo(() => {
+    const w = user.weight || 75;
+    const currentSessions = progressRecord?.sessionsCompleted || 0;
+    const currentWeek = isZeroState ? 1 : Math.min(6, Math.max(1, Math.floor(currentSessions / 3) + 1));
+
+    const weeks = [
+      {
+        weekNumber: 1,
+        phaseName: 'Adaptación Anatómica & Calibración Biomecánica',
+        overloadPercent: '+0.0%',
+        overloadIncrementKg: '+0.0 kg',
+        avgLoadKg: Math.round(w * 0.75),
+        targetVolumeReps: '120 reps efectivas',
+        status: isZeroState ? 'Activo' : (currentWeek > 1 ? 'Completado' : currentWeek === 1 ? 'Activo' : 'Programado'),
+        coachTip: 'Foco en tempo excéntrico controlado de 3s y alineación articular.',
+      },
+      {
+        weekNumber: 2,
+        phaseName: 'Hipertrofia Funcional & Tensión Mecánica',
+        overloadPercent: '+2.5%',
+        overloadIncrementKg: '+1.5 kg - 2.0 kg',
+        avgLoadKg: Math.round(w * 0.75 * 1.025),
+        targetVolumeReps: '130 reps efectivas',
+        status: isZeroState ? 'Programado' : (currentWeek > 2 ? 'Completado' : currentWeek === 2 ? 'Activo' : 'Programado'),
+        coachTip: 'Incorporación de microcargas progresivas en levantamientos básicos.',
+      },
+      {
+        weekNumber: 3,
+        phaseName: 'Sobrecarga Progresiva Dinámica - Fase I',
+        overloadPercent: '+5.0%',
+        overloadIncrementKg: '+3.0 kg - 4.0 kg',
+        avgLoadKg: Math.round(w * 0.75 * 1.05),
+        targetVolumeReps: '140 reps efectivas',
+        status: isZeroState ? 'Programado' : (currentWeek > 3 ? 'Completado' : currentWeek === 3 ? 'Activo' : 'Programado'),
+        coachTip: 'Mayor densidad de estímulo sin alterar la cadencia ni el rango de movimiento.',
+      },
+      {
+        weekNumber: 4,
+        phaseName: 'Sobrecarga Progresiva Dinámica - Fase II',
+        overloadPercent: '+7.5%',
+        overloadIncrementKg: '+4.5 kg - 5.5 kg',
+        avgLoadKg: Math.round(w * 0.75 * 1.075),
+        targetVolumeReps: '140 reps efectivas',
+        status: isZeroState ? 'Programado' : (currentWeek > 4 ? 'Completado' : currentWeek === 4 ? 'Activo' : 'Programado'),
+        coachTip: 'Pico de volumen muscular. Énfasis en recuperación e hidratación.',
+      },
+      {
+        weekNumber: 5,
+        phaseName: 'Fuerza Máxima e Intensidad Neuromuscular',
+        overloadPercent: '+10.0%',
+        overloadIncrementKg: '+6.0 kg - 8.0 kg',
+        avgLoadKg: Math.round(w * 0.75 * 1.10),
+        targetVolumeReps: '110 reps efectivas',
+        status: isZeroState ? 'Programado' : (currentWeek > 5 ? 'Completado' : currentWeek === 5 ? 'Activo' : 'Programado'),
+        coachTip: 'Reclutamiento motor máximo a RPE 9. Mayor tiempo de descanso interserie.',
+      },
+      {
+        weekNumber: 6,
+        phaseName: 'Descarga Programada (Deload) & Supercompensación',
+        overloadPercent: '-30.0%',
+        overloadIncrementKg: 'Carga regenerativa',
+        avgLoadKg: Math.round(w * 0.75 * 0.70),
+        targetVolumeReps: '70 reps regenerativas',
+        status: isZeroState ? 'Programado' : (currentWeek > 6 ? 'Completado' : currentWeek === 6 ? 'Activo' : 'Programado'),
+        coachTip: 'Disipación de fatiga central para asimilar la adaptación neuromuscular.',
+      },
+    ];
+
+    return { weeks, currentWeek };
+  }, [user.weight, progressRecord?.sessionsCompleted, isZeroState]);
+
   const maxVolume = isZeroState ? 1000 : Math.max(1000, Math.round(bioProfile.targetSessionVolumeKg * 1.25));
 
   const renderGreeting = () => {
@@ -385,19 +571,24 @@ export const AthleteDashboardView: React.FC<AthleteDashboardViewProps> = ({
         <StaggerItem direction="up" distance={20}>
           <div className="p-4 rounded-xl bg-[#13131A] border border-[#22222E] hover:border-[#56A867]/30 transition-all h-full">
             <div className="flex items-center justify-between text-[#8E8E9E] mb-2">
-              <span className="text-xs font-mono uppercase">{language === 'en' ? 'Total Load' : language === 'pt' ? 'Carga Total' : language === 'fr' ? 'Charge Totale' : language === 'de' ? 'Gesamtlast' : 'Carga Acumulada'}</span>
-              <TrendingUp className="w-4 h-4 text-[#56A867]" />
+              <span className="text-xs font-mono uppercase text-[#56A867] font-bold">
+                {language === 'en' ? 'Target Weight Today' : 'Peso Sugerido Hoy'}
+              </span>
+              <Dumbbell className="w-4 h-4 text-[#56A867]" />
             </div>
-            <div className="text-2xl font-bold font-mono text-white">
-              {totalVolumeKg > 0 ? `${(totalVolumeKg / 1000).toFixed(1)} T` : '0.0 T'}
+            <div className="text-2xl font-bold font-mono text-white flex items-baseline gap-1">
+              <span>{suggestedExerciseToday.targetWeightKg}</span>
+              <span className="text-xs font-normal text-[#8E8E9E]">kg</span>
             </div>
-            <p className="text-[11px] text-[#56A867] mt-1 font-mono">
-              {isInactiveOver15Days
-                ? (language === 'en' ? 'Reset to 0 (>15 days inactive)' : 'Reiniciado a 0 (>15 días inactivo)')
-                : !hasCompletedAnySession
-                ? (language === 'en' ? 'No prior sessions (0.0 T)' : 'Sin sesiones previas (0.0 T)')
-                : (language === 'en' ? `${(totalVolumeKg / 1000).toFixed(1)} T accumulated` : `${(totalVolumeKg / 1000).toFixed(1)} T acumuladas`)}
+            <p className="text-[11px] text-white font-medium mt-1 truncate">
+              {suggestedExerciseToday.exerciseName}
             </p>
+            <div className="mt-1 flex items-center gap-1.5 text-[10px] text-[#56A867] font-mono">
+              <TrendingUp className="w-3 h-3 shrink-0" />
+              <span className="truncate">
+                {suggestedExerciseToday.reps} • +{suggestedExerciseToday.overloadPercent}% sobrecarga (+{suggestedExerciseToday.overloadIncrementKg} kg)
+              </span>
+            </div>
           </div>
         </StaggerItem>
 
@@ -913,6 +1104,187 @@ export const AthleteDashboardView: React.FC<AthleteDashboardViewProps> = ({
                     : (language === 'en' ? 'Active' : 'Activo')}
                 </span>
               </div>
+            </div>
+          </div>
+        </div>
+      </ScrollReveal>
+
+      {/* TABLAS DE CONTROL DE FUERZA & CARGA PROGRESIVA DINÁMICA */}
+      <ScrollReveal direction="up" delay={0.09} duration={0.5}>
+        <div className="space-y-6">
+          {/* TABLA 1: CONTROL DE FUERZA Y ESTIMACIÓN 1RM */}
+          <div className="p-5 sm:p-6 rounded-2xl bg-[#121218] border border-[#20202A] space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#20202A]">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-[#56A867]/15 text-[#56A867]">
+                  <Dumbbell className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white font-serif uppercase tracking-wider flex items-center gap-2">
+                    <span>{language === 'en' ? 'Strength Tracking & 1RM Estimates' : 'Tabla de Control de Fuerza & Estimación 1RM'}</span>
+                    <span className="px-2 py-0.5 rounded-full bg-[#56A867]/20 text-[#56A867] text-[10px] font-mono font-bold">
+                      Fórmula Brzycki
+                    </span>
+                  </h3>
+                  <p className="text-[11px] text-[#8E8E9E]">
+                    {language === 'en'
+                      ? 'Target working loads, planned volume, and calculated 1RM based on athlete bodyweight and active overload.'
+                      : 'Cargas efectivas de trabajo, series × repeticiones y 1RM calculado a partir del peso corporal del atleta.'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 text-xs font-mono text-[#56A867] bg-[#161622] px-3 py-1 rounded-xl border border-[#242436]">
+                <TrendingUp className="w-4 h-4" />
+                <span>
+                  {language === 'en' ? 'Active Overload:' : 'Sobrecarga Activa:'}{' '}
+                  <strong>+{isZeroState ? 0 : Math.round((progressiveOverloadFactor - 1) * 100 * 10) / 10}%</strong>
+                </span>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs font-mono border-collapse">
+                <thead>
+                  <tr className="border-b border-[#242436] text-[#8E8E9E] uppercase text-[10px] tracking-wider">
+                    <th className="py-2.5 px-3">{language === 'en' ? 'Exercise' : 'Ejercicio'}</th>
+                    <th className="py-2.5 px-3">{language === 'en' ? 'Target Muscle' : 'Músculo Principal'}</th>
+                    <th className="py-2.5 px-3 text-center">{language === 'en' ? 'Working Weight' : 'Carga de Trabajo'}</th>
+                    <th className="py-2.5 px-3 text-center">{language === 'en' ? 'Sets × Reps' : 'Series × Reps'}</th>
+                    <th className="py-2.5 px-3 text-center text-[#56A867]">{language === 'en' ? 'Estimated 1RM' : '1RM Estimado'}</th>
+                    <th className="py-2.5 px-3 text-center">{language === 'en' ? 'Target RPE' : 'RPE Objetivo'}</th>
+                    <th className="py-2.5 px-3 text-right">{language === 'en' ? 'Progression Rule' : 'Regla de Aumento'}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#1D1D2A] text-neutral-200">
+                  {strengthTableData.map((item) => (
+                    <tr key={item.id} className="hover:bg-[#161622]/60 transition-colors">
+                      <td className="py-3 px-3 font-bold text-white flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#56A867]" />
+                        <span>{item.name}</span>
+                      </td>
+                      <td className="py-3 px-3 text-[#9E9EA8]">{item.targetMuscle}</td>
+                      <td className="py-3 px-3 text-center font-bold text-white">
+                        <span className="px-2 py-1 rounded-lg bg-[#181824] border border-[#28283C]">
+                          {item.workingWeightKg} kg
+                        </span>
+                      </td>
+                      <td className="py-3 px-3 text-center text-[#A0A0B0]">
+                        {item.sets} × {item.reps}
+                      </td>
+                      <td className="py-3 px-3 text-center font-bold text-[#56A867]">
+                        <span className="px-2 py-1 rounded-lg bg-[#56A867]/10 border border-[#56A867]/30">
+                          {item.estimatedOneRmKg} kg
+                        </span>
+                      </td>
+                      <td className="py-3 px-3 text-center text-[#C0C0D0]">
+                        {item.rpeTarget}
+                      </td>
+                      <td className="py-3 px-3 text-right text-emerald-400 font-semibold">
+                        {item.weeklyOverload}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* TABLA 2: REGISTRO DE PROGRESIÓN DE SOBRECARGA DINÁMICA (SEMANA A SEMANA) */}
+          <div className="p-5 sm:p-6 rounded-2xl bg-[#121218] border border-[#20202A] space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#20202A]">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-[#56A867]/15 text-[#56A867]">
+                  <TrendingUp className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white font-serif uppercase tracking-wider flex items-center gap-2">
+                    <span>{language === 'en' ? 'Dynamic Progressive Overload Calendar' : 'Tabla de Progresión de Sobrecarga Dinámica'}</span>
+                    <span className="px-2 py-0.5 rounded-full bg-[#56A867]/20 text-[#56A867] text-[10px] font-mono font-bold">
+                      Mesociclo 6 Semanas
+                    </span>
+                  </h3>
+                  <p className="text-[11px] text-[#8E8E9E]">
+                    {language === 'en'
+                      ? 'Periodized progression: incremental +2.5% load per week to guarantee continuous strength and neuromuscular adaptation.'
+                      : 'Periodización de sobrecarga: incremento del 2.5% semanal para garantizar sobrecarga progresiva y evitar mesetas.'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 text-xs font-mono text-[#8E8E9E]">
+                <span>Semana Actual:</span>
+                <span className="px-2.5 py-1 rounded-lg bg-[#56A867] text-black font-bold font-mono">
+                  Semana {progressiveOverloadCycle.currentWeek} de 6
+                </span>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs font-mono border-collapse">
+                <thead>
+                  <tr className="border-b border-[#242436] text-[#8E8E9E] uppercase text-[10px] tracking-wider">
+                    <th className="py-2.5 px-3">{language === 'en' ? 'Microcycle' : 'Microciclo'}</th>
+                    <th className="py-2.5 px-3">{language === 'en' ? 'Biomechanical Phase' : 'Fase & Enfoque'}</th>
+                    <th className="py-2.5 px-3 text-center">{language === 'en' ? 'Overload Rate' : 'Sobrecarga (%)'}</th>
+                    <th className="py-2.5 px-3 text-center">{language === 'en' ? 'Load Increment' : 'Incremento en kg'}</th>
+                    <th className="py-2.5 px-3 text-center">{language === 'en' ? 'Avg Load' : 'Carga Media'}</th>
+                    <th className="py-2.5 px-3 text-center">{language === 'en' ? 'Effective Volume' : 'Volumen'}</th>
+                    <th className="py-2.5 px-3 text-center">{language === 'en' ? 'Status' : 'Estado'}</th>
+                    <th className="py-2.5 px-3">{language === 'en' ? "Coach's Technical Guidance" : 'Indicación Técnica del Coach'}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#1D1D2A] text-neutral-200">
+                  {progressiveOverloadCycle.weeks.map((week) => {
+                    const isCurrent = week.status === 'Activo';
+                    return (
+                      <tr
+                        key={week.weekNumber}
+                        className={`transition-colors ${
+                          isCurrent
+                            ? 'bg-[#56A867]/10 border-l-2 border-[#56A867]'
+                            : 'hover:bg-[#161622]/60'
+                        }`}
+                      >
+                        <td className="py-3 px-3 font-bold text-white whitespace-nowrap">
+                          Semana {week.weekNumber}
+                        </td>
+                        <td className="py-3 px-3 text-white font-medium">
+                          {week.phaseName}
+                        </td>
+                        <td className="py-3 px-3 text-center font-bold text-[#56A867]">
+                          {week.overloadPercent}
+                        </td>
+                        <td className="py-3 px-3 text-center text-[#A0A0B0]">
+                          {week.overloadIncrementKg}
+                        </td>
+                        <td className="py-3 px-3 text-center font-bold text-white">
+                          {week.avgLoadKg} kg
+                        </td>
+                        <td className="py-3 px-3 text-center text-[#9E9EA8] whitespace-nowrap">
+                          {week.targetVolumeReps}
+                        </td>
+                        <td className="py-3 px-3 text-center whitespace-nowrap">
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                              week.status === 'Completado'
+                                ? 'bg-emerald-500/20 text-emerald-400'
+                                : week.status === 'Activo'
+                                ? 'bg-[#56A867] text-black'
+                                : 'bg-[#1E1E2C] text-[#707080]'
+                            }`}
+                          >
+                            {week.status}
+                          </span>
+                        </td>
+                        <td className="py-3 px-3 text-[11px] text-[#A0A0B0] italic">
+                          {week.coachTip}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>

@@ -5,7 +5,7 @@ import crypto from "crypto";
 import { GoogleGenAI } from "@google/genai";
 import { createServer as createViteServer } from "vite";
 import { serverDatabase } from "./server/db";
-import { emailService } from "./server/emailService";
+import { emailService, maskEmail } from "./server/emailService";
 import { verificationService } from "./server/verificationService";
 
 const app = express();
@@ -325,11 +325,7 @@ app.post("/api/auth/login", (req, res) => {
 app.post("/api/auth/send-verification-code", async (req, res) => {
   try {
     const { email, purpose = "registro" } = req.body || {};
-    if (!email || !email.trim()) {
-      return res.status(400).json({ success: false, error: "El correo electrónico es requerido." });
-    }
-
-    const cleanEmail = email.trim().toLowerCase();
+    const masked = maskEmail(email || "");
     const clientIp = (
       (req.headers["x-forwarded-for"] as string)?.split(",")[0] ||
       req.ip ||
@@ -337,8 +333,20 @@ app.post("/api/auth/send-verification-code", async (req, res) => {
       ""
     ).trim();
 
+    console.log(`[DIAG] [ROUTE /send-verification-code] Petición POST recibida | Email: ${masked} | Purpose: ${purpose} | IP: ${clientIp || 'unknown'}`);
+
+    if (!email || !email.trim()) {
+      console.warn(`[DIAG] [ROUTE /send-verification-code] Rechazada: Correo electrónico vacío o no proporcionado.`);
+      return res.status(400).json({ success: false, error: "El correo electrónico es requerido." });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+
+    console.log(`[DIAG] [ROUTE /send-verification-code] Invocando verificationService.generateAndSendCode para ${masked}...`);
     const result = await verificationService.generateAndSendCode(cleanEmail, purpose, clientIp);
+
     if (!result.success) {
+      console.error(`[DIAG] [ROUTE /send-verification-code] Falló generateAndSendCode para ${masked}: ${result.error}`);
       return res.status(result.status || 400).json({
         success: false,
         error: result.error,
@@ -346,13 +354,14 @@ app.post("/api/auth/send-verification-code", async (req, res) => {
       });
     }
 
+    console.log(`[DIAG] [ROUTE /send-verification-code] Respuesta 200 OK enviada al cliente para ${masked}`);
     // Security: NEVER return verification PIN in HTTP response
     return res.json({
       success: true,
       message: result.message,
     });
   } catch (error: any) {
-    console.error("send-verification-code error:", error);
+    console.error("[DIAG] [ROUTE /send-verification-code] Excepción no controlada:", error);
     return res.status(500).json({ success: false, error: "Error en el servidor al despachar el código." });
   }
 });
@@ -361,6 +370,9 @@ app.post("/api/auth/send-verification-code", async (req, res) => {
 app.post("/api/auth/trainer/send-credential", async (req, res) => {
   try {
     const { email, trainerName, trainerCode } = req.body || {};
+    const masked = maskEmail(email || "");
+    console.log(`[DIAG] [ROUTE /trainer/send-credential] Petición recibida para ${masked}`);
+
     if (!email || !email.trim()) {
       return res.status(400).json({ success: false, error: "El correo electrónico es requerido." });
     }
@@ -380,7 +392,7 @@ app.post("/api/auth/trainer/send-credential", async (req, res) => {
       result,
     });
   } catch (error: any) {
-    console.error("/api/auth/trainer/send-credential error:", error);
+    console.error("[DIAG] [ROUTE /trainer/send-credential] Error:", error);
     return res.status(500).json({ success: false, error: "Error en el servidor al enviar código de entrenador." });
   }
 });
@@ -389,12 +401,17 @@ app.post("/api/auth/trainer/send-credential", async (req, res) => {
 app.post("/api/auth/verify-code", async (req, res) => {
   try {
     const { email, code } = req.body || {};
+    const masked = maskEmail(email || "");
+    console.log(`[DIAG] [ROUTE /verify-code] Petición POST recibida para ${masked}`);
+
     if (!email || !code) {
+      console.warn(`[DIAG] [ROUTE /verify-code] Rechazada: Correo o código ausente para ${masked}`);
       return res.status(400).json({ success: false, error: "Correo electrónico y código son obligatorios." });
     }
 
     const result = await verificationService.verifyCode(email, code);
     if (!result.success) {
+      console.warn(`[DIAG] [ROUTE /verify-code] Validación de código no exitosa para ${masked}: ${result.error}`);
       return res.status(result.status || 400).json({
         success: false,
         error: result.error,
@@ -402,13 +419,14 @@ app.post("/api/auth/verify-code", async (req, res) => {
       });
     }
 
+    console.log(`[DIAG] [ROUTE /verify-code] Validación exitosa para ${masked}`);
     return res.json({
       success: true,
       message: result.message,
       verificationToken: result.verificationToken,
     });
   } catch (error: any) {
-    console.error("verify-code error:", error);
+    console.error("[DIAG] [ROUTE /verify-code] Excepción no controlada:", error);
     return res.status(500).json({ success: false, error: "Error al validar el código." });
   }
 });
@@ -417,11 +435,7 @@ app.post("/api/auth/verify-code", async (req, res) => {
 app.post("/api/auth/forgot-password/send-code", async (req, res) => {
   try {
     const { email } = req.body || {};
-    if (!email || !email.trim()) {
-      return res.status(400).json({ success: false, error: "Ingresa tu correo electrónico." });
-    }
-
-    const cleanEmail = email.trim().toLowerCase();
+    const masked = maskEmail(email || "");
     const clientIp = (
       (req.headers["x-forwarded-for"] as string)?.split(",")[0] ||
       req.ip ||
@@ -429,9 +443,19 @@ app.post("/api/auth/forgot-password/send-code", async (req, res) => {
       ""
     ).trim();
 
-    // Check rate limits & cooldown (60s cooldown, max 5/hr per email & IP)
+    console.log(`[DIAG] [ROUTE /forgot-password/send-code] Petición POST recibida | Email: ${masked} | IP: ${clientIp || 'unknown'}`);
+
+    if (!email || !email.trim()) {
+      console.warn(`[DIAG] [ROUTE /forgot-password/send-code] Rechazada: Correo no ingresado.`);
+      return res.status(400).json({ success: false, error: "Ingresa tu correo electrónico." });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+
+    // Check rate limits & cooldown (60s cooldown, max 5/hr per email)
     const rateCheck = verificationService.checkRateLimits(cleanEmail, clientIp);
     if (!rateCheck.allowed) {
+      console.warn(`[DIAG] [ROUTE /forgot-password/send-code] Rechazada por rate limit (${rateCheck.error}) para ${masked}`);
       return res.status(rateCheck.status || 429).json({
         success: false,
         error: rateCheck.error,
@@ -439,30 +463,30 @@ app.post("/api/auth/forgot-password/send-code", async (req, res) => {
       });
     }
 
-    // Check if account exists in database
-    const userExists = !!serverDatabase.findUserByEmail(cleanEmail);
+    // Check if account exists in database for diagnostics
+    const userInServerDb = !!serverDatabase.findUserByEmail(cleanEmail);
+    console.log(`[DIAG] [ROUTE /forgot-password/send-code] Verificación en base de datos local: inServerDb=${userInServerDb} para ${masked}`);
 
-    if (userExists) {
-      const result = await verificationService.generateAndSendCode(cleanEmail, "password_reset", clientIp);
-      if (!result.success) {
-        return res.status(result.status || 500).json({
-          success: false,
-          error: result.error,
-          message: result.message,
-        });
-      }
-    } else {
-      // Record rate limit consumption even for non-existent emails to prevent enumeration abuse
-      verificationService.recordSend(cleanEmail, clientIp);
+    // Unified dispatch: ALWAYS call generateAndSendCode with await, ensuring SendGrid is invoked
+    console.log(`[DIAG] [ROUTE /forgot-password/send-code] Invocando verificationService.generateAndSendCode (purpose: password_reset) para ${masked}...`);
+    const result = await verificationService.generateAndSendCode(cleanEmail, "password_reset", clientIp);
+
+    if (!result.success) {
+      console.error(`[DIAG] [ROUTE /forgot-password/send-code] ERROR al despachar código para ${masked}: ${result.error}`);
+      return res.status(result.status || 502).json({
+        success: false,
+        error: result.error || 'send_failed',
+        message: result.message || 'No se pudo enviar el correo de recuperación. Revisa la configuración del proveedor de correo.',
+      });
     }
 
-    // Security: Response is 100% IDENTICAL whether the email exists or not to prevent account enumeration
+    console.log(`[DIAG] [ROUTE /forgot-password/send-code] ÉXITO: Correo de recuperación despachado satisfactoriamente para ${masked}`);
     return res.json({
       success: true,
-      message: `Si la cuenta ${cleanEmail} está registrada en Sportfitness, recibirás un código de recuperación de 6 dígitos. Revisa tu bandeja de entrada o spam.`,
+      message: `Código de recuperación de 6 dígitos enviado a ${cleanEmail}. Revisa tu bandeja de entrada o spam.`,
     });
   } catch (error: any) {
-    console.error("forgot-password send-code error:", error);
+    console.error("[DIAG] [ROUTE /forgot-password/send-code] Excepción no controlada:", error);
     return res.status(500).json({ success: false, error: "Error al solicitar código de recuperación." });
   }
 });

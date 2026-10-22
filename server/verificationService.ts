@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { emailService } from './emailService';
+import { emailService, maskEmail } from './emailService';
 
 export interface VerificationRecord {
   email: string;
@@ -64,7 +64,7 @@ class VerificationService {
    * Rate limiting and cooldown checks:
    * 1. 60-second cooldown per email
    * 2. Max 5 sends per hour per email
-   * 3. Max 5 sends per hour per client IP
+   * 3. Max 5 sends per hour per client IP (excluding local dev loopback)
    */
   public checkRateLimits(
     email: string,
@@ -81,6 +81,7 @@ class VerificationService {
     if (emailRecord) {
       if (now - emailRecord.lastSent < COOLDOWN) {
         const remainingSec = Math.ceil((COOLDOWN - (now - emailRecord.lastSent)) / 1000);
+        console.warn(`[DIAG] [VERIF-SVC] Rate limit: Cooldown activo para ${maskEmail(cleanEmail)} (restan ${remainingSec}s)`);
         return {
           allowed: false,
           status: 429,
@@ -91,6 +92,7 @@ class VerificationService {
 
       const recentEmailSends = emailRecord.sendTimestamps.filter((ts) => now - ts < ONE_HOUR);
       if (recentEmailSends.length >= 5) {
+        console.warn(`[DIAG] [VERIF-SVC] Rate limit: Límite horario de 5 envíos alcanzado para ${maskEmail(cleanEmail)}`);
         return {
           allowed: false,
           status: 429,
@@ -100,17 +102,21 @@ class VerificationService {
       }
     }
 
-    // 2. IP checks
-    const ipRecord = this.ipRateLimits.get(cleanIp);
-    if (ipRecord) {
-      const recentIpSends = ipRecord.sendTimestamps.filter((ts) => now - ts < ONE_HOUR);
-      if (recentIpSends.length >= 5) {
-        return {
-          allowed: false,
-          status: 429,
-          error: 'ip_limit_reached',
-          message: 'Has alcanzado el límite de 5 envíos por hora desde tu conexión. Por favor intenta más tarde.',
-        };
+    // 2. IP checks (exempt loopback/localhost in preview to avoid collective lockout)
+    const isLocalIp = cleanIp === '::1' || cleanIp === '127.0.0.1' || cleanIp === '::ffff:127.0.0.1' || cleanIp === 'localhost' || cleanIp === 'unknown';
+    if (!isLocalIp) {
+      const ipRecord = this.ipRateLimits.get(cleanIp);
+      if (ipRecord) {
+        const recentIpSends = ipRecord.sendTimestamps.filter((ts) => now - ts < ONE_HOUR);
+        if (recentIpSends.length >= 5) {
+          console.warn(`[DIAG] [VERIF-SVC] Rate limit: Límite de 5 envíos por IP alcanzado para IP: ${cleanIp}`);
+          return {
+            allowed: false,
+            status: 429,
+            error: 'ip_limit_reached',
+            message: 'Has alcanzado el límite de 5 envíos por hora desde tu conexión. Por favor intenta más tarde.',
+          };
+        }
       }
     }
 
@@ -151,9 +157,13 @@ class VerificationService {
     ip: string = ''
   ): Promise<{ success: boolean; status?: number; error?: string; message: string }> {
     const cleanEmail = (email || '').trim().toLowerCase();
+    const masked = maskEmail(cleanEmail);
+
+    console.log(`[DIAG] [VERIF-SVC] generateAndSendCode iniciado | Email: ${masked} | Purpose: ${purpose} | IP: ${ip || 'unknown'}`);
 
     // 1. Validate email format
     if (!this.isValidEmail(cleanEmail)) {
+      console.warn(`[DIAG] [VERIF-SVC] Validación rechazada: Formato de correo no válido para ${masked}`);
       return {
         success: false,
         status: 400,
@@ -165,6 +175,7 @@ class VerificationService {
     // 2. Rate limiting check
     const rateCheck = this.checkRateLimits(cleanEmail, ip);
     if (!rateCheck.allowed) {
+      console.warn(`[DIAG] [VERIF-SVC] Validación rechazada por rate limit (${rateCheck.error}) para ${masked}: ${rateCheck.message}`);
       return {
         success: false,
         status: rateCheck.status || 429,
@@ -173,17 +184,24 @@ class VerificationService {
       };
     }
 
+    console.log(`[DIAG] [VERIF-SVC] Validaciones superadas para ${masked}. Generando código numérico de 6 dígitos...`);
+
     // 3. Generate 6-digit code with leading zeros (000000 - 999999)
     const numericCode = crypto.randomInt(0, 1000000).toString().padStart(6, '0');
 
-    // 4. Send email strictly to the destination email via SendGrid
+    // 4. Send email strictly to the destination email via SendGrid (awaited before returning)
+    console.log(`[DIAG] [VERIF-SVC] Despachando a emailService.sendVerificationEmail para ${masked}...`);
     const emailResult = await emailService.sendVerificationEmail(cleanEmail, numericCode, purpose);
+
     if (!emailResult.success) {
+      // Clean up / purge any partial code record so un-sent codes never linger
+      this.codes.delete(cleanEmail);
+      console.error(`[DIAG] [VERIF-SVC] ERROR: Envío rechazado por emailService para ${masked}. Detalle: ${emailResult.error}. Limpiando registro de código.`);
       return {
         success: false,
         status: 502,
-        error: 'send_failed',
-        message: 'No se pudo enviar el correo de verificación. Por favor verifica la dirección e inténtalo más tarde.',
+        error: emailResult.error || 'send_failed',
+        message: `No se pudo enviar el correo de verificación (${emailResult.error || 'Fallo del proveedor'}). Por favor verifica el servicio de correo.`,
       };
     }
 
@@ -205,6 +223,8 @@ class VerificationService {
     this.codes.set(cleanEmail, record);
     this.recordSend(cleanEmail, ip);
 
+    console.log(`[DIAG] [VERIF-SVC] ÉXITO: Código despachado correctamente a ${masked} y hash SHA-256 persistido en memoria (expira en 10m)`);
+
     return {
       success: true,
       message: `Código de verificación de 6 dígitos enviado exitosamente a ${cleanEmail}. Revisa tu bandeja de entrada o spam.`,
@@ -223,9 +243,13 @@ class VerificationService {
   ): Promise<{ success: boolean; status?: number; error?: string; message: string; verificationToken?: string }> {
     const cleanEmail = (email || '').trim().toLowerCase();
     const cleanCode = (inputCode || '').replace(/\D/g, '').trim();
+    const masked = maskEmail(cleanEmail);
+
+    console.log(`[DIAG] [VERIF-SVC] Intento de verificación de código para ${masked} | Longitud código recibido: ${cleanCode.length}`);
 
     // 1. Email format check
     if (!this.isValidEmail(cleanEmail)) {
+      console.warn(`[DIAG] [VERIF-SVC] Verificación rechazada: Formato inválido para ${masked}`);
       return {
         success: false,
         status: 400,
@@ -236,6 +260,7 @@ class VerificationService {
 
     // 2. Code format check (must be exactly 6 digits)
     if (!cleanCode || cleanCode.length !== 6 || !/^\d{6}$/.test(cleanCode)) {
+      console.warn(`[DIAG] [VERIF-SVC] Verificación rechazada: Código debe tener exactamente 6 dígitos para ${masked}`);
       return {
         success: false,
         status: 400,
@@ -248,6 +273,7 @@ class VerificationService {
     const now = Date.now();
 
     if (!record || record.used) {
+      console.warn(`[DIAG] [VERIF-SVC] Verificación rechazada: Código no encontrado o ya utilizado para ${masked}`);
       return {
         success: false,
         status: 400,
@@ -259,6 +285,7 @@ class VerificationService {
     // Check expiration (10 minutes)
     if (now > record.expiresAt) {
       record.used = true;
+      console.warn(`[DIAG] [VERIF-SVC] Verificación rechazada: Código expirado para ${masked}`);
       return {
         success: false,
         status: 400,
@@ -270,6 +297,7 @@ class VerificationService {
     // Check failed attempts limit (max 5)
     if (record.failedAttempts >= 5) {
       record.used = true;
+      console.warn(`[DIAG] [VERIF-SVC] Verificación rechazada: Máximo de 5 intentos fallidos superado para ${masked}`);
       return {
         success: false,
         status: 403,
@@ -283,6 +311,7 @@ class VerificationService {
     if (inputHash !== record.codeHash) {
       record.failedAttempts++;
       const remaining = 5 - record.failedAttempts;
+      console.warn(`[DIAG] [VERIF-SVC] Verificación fallida: Código incorrecto para ${masked}. Intento ${record.failedAttempts}/5`);
 
       if (record.failedAttempts >= 5) {
         record.used = true;
@@ -314,6 +343,8 @@ class VerificationService {
       expiresAt: now + 10 * 60 * 1000,
       createdAt: now,
     });
+
+    console.log(`[DIAG] [VERIF-SVC] Verificación EXITOSA para ${masked}. Token emitido: ${verificationToken.substring(0, 10)}...`);
 
     return {
       success: true,
