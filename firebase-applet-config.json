@@ -1,10 +1,12 @@
 {
   "projectId": "sportfitness-fdf73",
-  "appId": "1:120325176727:web:34b3feca36d778e4b218d2",
+  "appId": "1:120325176727:web:ba143026e64acc62b218d2",
   "apiKey": "AIzaSyDm91EGXiIleYm_f48_koDJ3qzgd1i2ums",
   "authDomain": "sportfitness-fdf73.firebaseapp.com",
-  "firestoreDatabaseId": "(default)",
+  "firestoreDatabaseId": "ai-studio-sportfitnesspara-13d1b18f-939a-4926-8fb2-9dc953e965e2",
   "storageBucket": "sportfitness-fdf73.firebasestorage.app",
   "messagingSenderId": "120325176727",
-  "measurementId": "G-1D0T36QDVQ"
+  "measurementId": "",
+  "oAuthClientId": "120325176727-aq9qgr2ql1u6s2bsd6h3kic5kk3ntict.apps.googleusercontent.com",
+  "recaptchaSiteKey": ""
 }

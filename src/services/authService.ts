@@ -674,16 +674,13 @@ Equipo de Seguridad Sportfitness
       sessionStorage.setItem(`recovery_code_${cleanEmail}`, code);
     } catch {}
 
-    // 2. Register code with backend server with 2500ms timeout
+    // 2. Register code with backend server
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 2500);
       await fetch('/api/auth/forgot-password/send-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: cleanEmail, code }),
-        signal: controller.signal,
-      }).finally(() => clearTimeout(timeoutId));
+      });
     } catch (err: any) {
       console.warn('Backend forgot-password fetch note:', err);
     }

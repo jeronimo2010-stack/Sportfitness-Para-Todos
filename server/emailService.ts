@@ -11,14 +11,18 @@ export interface EmailSendResult {
 class EmailService {
   private transporter: Transporter | null = null;
   private isConfigured: boolean = false;
-  private readonly sendGridApiKey: string =
-    process.env.SENDGRID_API_KEY || '';
-  private readonly sendGridFromEmail: string =
-    process.env.SENDGRID_FROM_EMAIL || 'sportfitness112@gmail.com';
-  private readonly sendGridFromName: string =
-    process.env.SENDGRID_FROM_NAME || 'Sportfitness';
-  private readonly sendGridReplyTo: string =
-    process.env.SENDGRID_REPLY_TO || 'mateobedoy20@gmail.com';
+  private get sendGridApiKey(): string {
+    return (process.env.SENDGRID_API_KEY || '').trim();
+  }
+  private get sendGridFromEmail(): string {
+    return (process.env.SENDGRID_FROM_EMAIL || 'sportfitness112@gmail.com').trim();
+  }
+  private get sendGridFromName(): string {
+    return (process.env.SENDGRID_FROM_NAME || 'Sportfitness').trim();
+  }
+  private get sendGridReplyTo(): string {
+    return (process.env.SENDGRID_REPLY_TO || 'mateobedoy20@gmail.com').trim();
+  }
 
   constructor() {
     this.initTransporter();
