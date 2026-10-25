@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { emailService, maskEmail } from './emailService';
+import { emailService, maskEmail } from './emailService.js';
 
 export interface VerificationRecord {
   email: string;

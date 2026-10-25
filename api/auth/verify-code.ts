@@ -1,4 +1,4 @@
-import { verificarCodigo } from '../../server/db';
+import { verificarCodigo } from '../../server/db.js';
 import crypto from 'crypto';
 
 export default async function handler(req: any, res: any) {

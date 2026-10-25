@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { db } from '../../server/db';
+import { db } from '../../server/db.js';
 
 const SENDGRID_API_KEY = (process.env.SENDGRID_API_KEY || '').trim();
 const SENDGRID_FROM_EMAIL = (process.env.SENDGRID_FROM_EMAIL || 'sportfitness112@gmail.com').trim();

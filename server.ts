@@ -4,9 +4,9 @@ import path from "path";
 import crypto from "crypto";
 import { GoogleGenAI } from "@google/genai";
 import { createServer as createViteServer } from "vite";
-import { serverDatabase } from "./server/db";
-import { emailService, maskEmail } from "./server/emailService";
-import { verificationService } from "./server/verificationService";
+import { serverDatabase } from "./server/db.js";
+import { emailService, maskEmail } from "./server/emailService.js";
+import { verificationService } from "./server/verificationService.js";
 
 const app = express();
 app.set("trust proxy", true);
