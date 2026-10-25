@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
+import { getAdminFirestore, type Query } from './firebaseAdmin.js';
 
 export interface UserHealthProfile {
   weight: number; // kg
@@ -134,6 +135,23 @@ interface DatabaseSchema {
 
 const DATA_DIR = path.join(process.cwd(), 'data');
 const DB_FILE = path.join(DATA_DIR, 'sportfitness_database.json');
+
+export const isServerless = Boolean(
+  process.env.VERCEL ||
+  process.env.AWS_LAMBDA_FUNCTION_NAME ||
+  process.env.LAMBDA_TASK_ROOT ||
+  process.env.VERCEL_ENV
+);
+
+async function saveUserToFirestore(user: DatabaseUser): Promise<void> {
+  const firestore = getAdminFirestore();
+  if (!firestore) return;
+  try {
+    await firestore.collection('users').doc(user.id).set(user, { merge: true });
+  } catch (err) {
+    console.warn('[Firestore Admin] Notice saving user to Firestore:', err);
+  }
+}
 
 // Helper for secure password hashing with salt
 export function hashPassword(password: string, existingSalt?: string): { hash: string; salt: string } {
@@ -315,11 +333,14 @@ class ServerDatabase {
   private initialized = false;
 
   private ensureDataDir() {
-    if (!fs.existsSync(DATA_DIR)) {
-      try {
+    if (isServerless) return;
+    try {
+      if (!fs.existsSync(DATA_DIR)) {
         fs.mkdirSync(DATA_DIR, { recursive: true });
-      } catch (err) {
-        console.error('Failed to create data directory:', err);
+      }
+    } catch (err: any) {
+      if (err?.code !== 'EROFS') {
+        console.warn('Failed to create data directory:', err?.message || err);
       }
     }
   }
@@ -329,7 +350,7 @@ class ServerDatabase {
     this.ensureDataDir();
 
     try {
-      if (fs.existsSync(DB_FILE)) {
+      if (!isServerless && fs.existsSync(DB_FILE)) {
         const raw = fs.readFileSync(DB_FILE, 'utf-8');
         this.db = JSON.parse(raw);
         if (!this.db.users || this.db.users.length === 0) {
@@ -363,7 +384,6 @@ class ServerDatabase {
         this.saveToFile();
       }
     } catch (error) {
-      console.error('Error loading database file, initializing with seeds:', error);
       this.db = {
         users: getInitialSeedUsers(),
         activeSessions: {},
@@ -378,11 +398,14 @@ class ServerDatabase {
   }
 
   public saveToFile() {
+    if (isServerless) return;
     try {
       this.ensureDataDir();
       fs.writeFileSync(DB_FILE, JSON.stringify(this.db, null, 2), 'utf-8');
-    } catch (error) {
-      console.error('Error saving database to file:', error);
+    } catch (error: any) {
+      if (error?.code !== 'EROFS') {
+        console.warn('Error saving database to file:', error?.message || error);
+      }
     }
   }
 
@@ -1244,7 +1267,7 @@ class ServerDatabase {
   }
 
   // ==========================================
-  // TOKENS MODEL (ORM-style for db.tokens)
+  // TOKENS MODEL (Firestore & Memory)
   // ==========================================
   public tokens = {
     findOne: async (options: {
@@ -1255,12 +1278,39 @@ class ServerDatabase {
         id?: string;
       };
     }): Promise<TokenRecord | null> => {
+      const { email, code, is_used, id } = options.where;
+      const firestore = getAdminFirestore();
+
+      if (firestore) {
+        try {
+          let q: Query = firestore.collection('tokens');
+          if (email !== undefined) {
+            q = q.where('email', '==', email.trim().toLowerCase());
+          }
+          if (is_used !== undefined) {
+            q = q.where('is_used', '==', is_used);
+          }
+          const snap = await q.get();
+          if (!snap.empty) {
+            const docs = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })) as TokenRecord[];
+            // Sort by creation time descending (newest first)
+            docs.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+            const match = docs.find((t) => {
+              if (id !== undefined && t.id !== id) return false;
+              if (code !== undefined && String(t.code).trim() !== String(code).trim()) return false;
+              return true;
+            });
+            if (match) return match;
+          }
+        } catch (fsErr) {
+          console.warn('[Firestore Admin] Notice searching tokens in Firestore:', fsErr);
+        }
+      }
+
       this.init();
       if (!this.db.tokens) {
         this.db.tokens = [];
       }
-      const { email, code, is_used, id } = options.where;
-
       const record = this.db.tokens.slice().reverse().find((t) => {
         if (id !== undefined && t.id !== id) return false;
         if (email !== undefined && t.email.trim().toLowerCase() !== email.trim().toLowerCase()) return false;
@@ -1276,18 +1326,48 @@ class ServerDatabase {
       values: Partial<TokenRecord>,
       options: { where: { id?: string; email?: string } }
     ): Promise<number> => {
+      let count = 0;
+      const firestore = getAdminFirestore();
+
+      if (firestore) {
+        try {
+          if (options.where.id) {
+            const docRef = firestore.collection('tokens').doc(options.where.id);
+            const docSnap = await docRef.get();
+            if (docSnap.exists) {
+              await docRef.set({ ...values, updatedAt: new Date().toISOString() }, { merge: true });
+              count++;
+            }
+          } else if (options.where.email) {
+            const snap = await firestore
+              .collection('tokens')
+              .where('email', '==', options.where.email.trim().toLowerCase())
+              .get();
+            const batch = firestore.batch();
+            snap.forEach((d) => {
+              batch.set(d.ref, { ...values, updatedAt: new Date().toISOString() }, { merge: true });
+              count++;
+            });
+            if (!snap.empty) {
+              await batch.commit();
+            }
+          }
+        } catch (fsErr) {
+          console.warn('[Firestore Admin] Notice updating tokens in Firestore:', fsErr);
+        }
+      }
+
       this.init();
       if (!this.db.tokens) {
         this.db.tokens = [];
       }
-      let count = 0;
       this.db.tokens = this.db.tokens.map((t) => {
         let match = true;
         if (options.where.id !== undefined && t.id !== options.where.id) match = false;
         if (options.where.email !== undefined && t.email.trim().toLowerCase() !== options.where.email.trim().toLowerCase()) match = false;
 
         if (match) {
-          count++;
+          if (!firestore) count++;
           return { ...t, ...values };
         }
         return t;
@@ -1310,8 +1390,9 @@ class ServerDatabase {
       if (!this.db.tokens) {
         this.db.tokens = [];
       }
+      const id = `tok-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
       const record: TokenRecord = {
-        id: `tok-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
+        id,
         email: tokenData.email.trim().toLowerCase(),
         code: tokenData.code.trim(),
         is_used: tokenData.is_used ?? false,
@@ -1319,12 +1400,46 @@ class ServerDatabase {
         created_at: new Date().toISOString(),
         purpose: tokenData.purpose || 'general',
       };
+
       this.db.tokens.push(record);
       this.saveToFile();
+
+      const firestore = getAdminFirestore();
+      if (firestore) {
+        try {
+          await firestore.collection('tokens').doc(id).set({
+            ...record,
+            expiresAtMs: new Date(tokenData.expires_at).getTime(),
+            createdAtMs: Date.now(),
+          });
+        } catch (fsErr) {
+          console.warn('[Firestore Admin] Notice writing token to Firestore:', fsErr);
+        }
+      }
+
       return record;
     },
 
     findAll: async (options?: { where?: Partial<TokenRecord> }): Promise<TokenRecord[]> => {
+      const firestore = getAdminFirestore();
+      if (firestore) {
+        try {
+          let q: Query = firestore.collection('tokens');
+          if (options?.where?.email) {
+            q = q.where('email', '==', options.where.email.trim().toLowerCase());
+          }
+          if (options?.where?.is_used !== undefined) {
+            q = q.where('is_used', '==', options.where.is_used);
+          }
+          const snap = await q.get();
+          if (!snap.empty) {
+            return snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })) as TokenRecord[];
+          }
+        } catch (fsErr) {
+          console.warn('[Firestore Admin] Notice findAll tokens in Firestore:', fsErr);
+        }
+      }
+
       this.init();
       if (!this.db.tokens) {
         this.db.tokens = [];
@@ -1338,6 +1453,85 @@ class ServerDatabase {
       });
     },
   };
+
+  // --- ASYNC USER & SESSION METHODS (FIRESTORE INTEGRATION) ---
+
+  public async findUserByEmailAsync(email: string): Promise<DatabaseUser | undefined> {
+    const clean = email.trim().toLowerCase();
+    const existing = this.findUserByEmail(clean);
+    if (existing) return existing;
+
+    const firestore = getAdminFirestore();
+    if (firestore) {
+      try {
+        const snap = await firestore.collection('users').where('email', '==', clean).limit(1).get();
+        if (!snap.empty) {
+          const u = snap.docs[0].data() as DatabaseUser;
+          this.init();
+          const inMemIdx = this.db.users.findIndex((x) => x.id === u.id);
+          if (inMemIdx >= 0) this.db.users[inMemIdx] = u;
+          else this.db.users.push(u);
+          return u;
+        }
+      } catch (err) {
+        console.warn('[Firestore Admin] Notice findUserByEmailAsync:', err);
+      }
+    }
+    return undefined;
+  }
+
+  public async findUserByIdAsync(id: string): Promise<DatabaseUser | undefined> {
+    const existing = this.findUserById(id);
+    if (existing) return existing;
+
+    const firestore = getAdminFirestore();
+    if (firestore) {
+      try {
+        const docSnap = await firestore.collection('users').doc(id).get();
+        if (docSnap.exists) {
+          const u = docSnap.data() as DatabaseUser;
+          this.init();
+          const inMemIdx = this.db.users.findIndex((x) => x.id === u.id);
+          if (inMemIdx >= 0) this.db.users[inMemIdx] = u;
+          else this.db.users.push(u);
+          return u;
+        }
+      } catch (err) {
+        console.warn('[Firestore Admin] Notice findUserByIdAsync:', err);
+      }
+    }
+    return undefined;
+  }
+
+  public async findUserByIdentifierAsync(identifier: string): Promise<DatabaseUser | undefined> {
+    if (!identifier || !identifier.trim()) return undefined;
+    const clean = identifier.trim().toLowerCase();
+    const existing = this.findUserByIdentifier(clean);
+    if (existing) return existing;
+
+    const firestore = getAdminFirestore();
+    if (firestore) {
+      try {
+        const snapEmail = await firestore.collection('users').where('email', '==', clean).limit(1).get();
+        if (!snapEmail.empty) {
+          const u = snapEmail.docs[0].data() as DatabaseUser;
+          this.init();
+          this.db.users.push(u);
+          return u;
+        }
+        const snapDoc = await firestore.collection('users').where('documentNumber', '==', clean).limit(1).get();
+        if (!snapDoc.empty) {
+          const u = snapDoc.docs[0].data() as DatabaseUser;
+          this.init();
+          this.db.users.push(u);
+          return u;
+        }
+      } catch (err) {
+        console.warn('[Firestore Admin] Notice findUserByIdentifierAsync:', err);
+      }
+    }
+    return undefined;
+  }
 }
 
 export const serverDatabase = new ServerDatabase();
@@ -1345,16 +1539,19 @@ export const db = serverDatabase;
 
 /**
  * Verifica un código de verificación activo según las reglas:
- * 1. Buscar el token activo y no expirado
+ * 1. Buscar el token activo y no expirado en Firestore o memoria
  * 2. Comprobar si ha expirado (15 minutos)
  * 3. Marcar como usado inmediatamente
  */
 export async function verificarCodigo(email: string, codigoIngresado: string) {
+  const cleanEmail = email.trim().toLowerCase();
+  const cleanCode = codigoIngresado.trim();
+
   // 1. Buscar el token activo y no expirado
   const registroToken = await db.tokens.findOne({
     where: { 
-      email: email.trim().toLowerCase(), 
-      code: codigoIngresado.trim(),
+      email: cleanEmail, 
+      code: cleanCode,
       is_used: false 
     }
   });
@@ -1363,7 +1560,7 @@ export async function verificarCodigo(email: string, codigoIngresado: string) {
     throw new Error("El código es incorrecto o ya ha sido utilizado.");
   }
 
-  // 2. Comprobar si ha expirado (ej. 15 minutos)
+  // 2. Comprobar si ha expirado (15 minutos)
   const ahora = new Date();
   if (ahora > new Date(registroToken.expires_at)) {
     throw new Error("El código ha expirado. Solicita uno nuevo.");

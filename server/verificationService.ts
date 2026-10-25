@@ -1,5 +1,7 @@
 import crypto from 'crypto';
 import { emailService, maskEmail } from './emailService.js';
+import { db } from './db.js';
+import { getAdminFirestore } from './firebaseAdmin.js';
 
 export interface VerificationRecord {
   email: string;
@@ -243,7 +245,31 @@ class VerificationService {
     this.codes.set(cleanEmail, record);
     this.recordSend(cleanEmail, ip);
 
-    console.log(`[DIAG] [VERIF-SVC] ÉXITO: Código despachado correctamente a ${masked} y hash SHA-256 persistido en memoria (expira en 10m)`);
+    // Persist token in Firestore tokens collection with expiration
+    try {
+      await db.tokens.create({
+        email: cleanEmail,
+        code: numericCode,
+        expires_at: new Date(now + EXPIRATION_MS).toISOString(),
+        is_used: false,
+        purpose,
+      });
+    } catch (tokErr) {
+      console.warn('[VERIF-SVC] Notice saving code to db.tokens:', tokErr);
+    }
+
+    const firestore = getAdminFirestore();
+    if (firestore) {
+      firestore
+        .collection('verification_records')
+        .doc(cleanEmail)
+        .set(record)
+        .catch((fsErr) => {
+          console.warn('[Firestore Admin] Notice saving verification record:', fsErr);
+        });
+    }
+
+    console.log(`[DIAG] [VERIF-SVC] ÉXITO: Código despachado correctamente a ${masked} y hash SHA-256 persistido (expira en 10m)`);
 
     return {
       success: true,
@@ -289,8 +315,61 @@ class VerificationService {
       };
     }
 
-    const record = this.codes.get(cleanEmail);
+    let record = this.codes.get(cleanEmail);
     const now = Date.now();
+
+    // Cross-lambda / Serverless fallback: Check Firestore if in-memory record is absent
+    if (!record) {
+      const firestore = getAdminFirestore();
+      if (firestore) {
+        try {
+          const docSnap = await firestore.collection('verification_records').doc(cleanEmail).get();
+          if (docSnap.exists) {
+            record = docSnap.data() as VerificationRecord;
+            this.codes.set(cleanEmail, record);
+          }
+        } catch (fsErr) {
+          console.warn('[Firestore Admin] Notice retrieving verification record:', fsErr);
+        }
+      }
+    }
+
+    // Secondary fallback: check db.tokens
+    if (!record || record.used) {
+      const dbToken = await db.tokens.findOne({
+        where: {
+          email: cleanEmail,
+          code: cleanCode,
+          is_used: false,
+        },
+      });
+
+      if (dbToken && new Date(dbToken.expires_at).getTime() > now) {
+        // Valid token found in db.tokens
+        await db.tokens.update({ is_used: true }, { where: { id: dbToken.id } });
+        const verificationToken = `vtok_${crypto.randomBytes(32).toString('hex')}`;
+        const tokenRec: VerificationTokenRecord = {
+          token: verificationToken,
+          email: cleanEmail,
+          purpose: dbToken.purpose || 'general',
+          expiresAt: now + 10 * 60 * 1000,
+          createdAt: now,
+        };
+        this.verifiedTokens.set(verificationToken, tokenRec);
+
+        const firestore = getAdminFirestore();
+        if (firestore) {
+          firestore.collection('verification_tokens').doc(verificationToken).set(tokenRec).catch(() => {});
+        }
+
+        console.log(`[DIAG] [VERIF-SVC] Verificación EXITOSA vía db.tokens para ${masked}. Token emitido: ${verificationToken.substring(0, 10)}...`);
+        return {
+          success: true,
+          message: 'Código verificado correctamente.',
+          verificationToken,
+        };
+      }
+    }
 
     if (!record || record.used) {
       console.warn(`[DIAG] [VERIF-SVC] Verificación rechazada: Código no encontrado o ya utilizado para ${masked}`);
@@ -333,6 +412,14 @@ class VerificationService {
       const remaining = 5 - record.failedAttempts;
       console.warn(`[DIAG] [VERIF-SVC] Verificación fallida: Código incorrecto para ${masked}. Intento ${record.failedAttempts}/5`);
 
+      const firestore = getAdminFirestore();
+      if (firestore) {
+        firestore.collection('verification_records').doc(cleanEmail).update({
+          failedAttempts: record.failedAttempts,
+          used: record.failedAttempts >= 5,
+        }).catch(() => {});
+      }
+
       if (record.failedAttempts >= 5) {
         record.used = true;
         return {
@@ -353,16 +440,28 @@ class VerificationService {
 
     // Code is valid! Mark as used immediately (single-use)
     record.used = true;
+    const firestore = getAdminFirestore();
+    if (firestore) {
+      firestore.collection('verification_records').doc(cleanEmail).update({ used: true }).catch(() => {});
+    }
+
+    // Also update any matching tokens in db.tokens
+    db.tokens.update({ is_used: true }, { where: { email: cleanEmail } }).catch(() => {});
 
     // Issue cryptographically secure single-use verificationToken (valid 10 minutes)
     const verificationToken = `vtok_${crypto.randomBytes(32).toString('hex')}`;
-    this.verifiedTokens.set(verificationToken, {
+    const tokenRecord: VerificationTokenRecord = {
       token: verificationToken,
       email: cleanEmail,
       purpose: record.purpose || 'general',
       expiresAt: now + 10 * 60 * 1000,
       createdAt: now,
-    });
+    };
+    this.verifiedTokens.set(verificationToken, tokenRecord);
+
+    if (firestore) {
+      firestore.collection('verification_tokens').doc(verificationToken).set(tokenRecord).catch(() => {});
+    }
 
     console.log(`[DIAG] [VERIF-SVC] Verificación EXITOSA para ${masked}. Token emitido: ${verificationToken.substring(0, 10)}...`);
 
@@ -382,16 +481,50 @@ class VerificationService {
     const cleanEmail = (email || '').trim().toLowerCase();
     const tokenRecord = this.verifiedTokens.get(token);
 
-    if (!tokenRecord) return false;
-    if (tokenRecord.email !== cleanEmail) return false;
-    if (Date.now() > tokenRecord.expiresAt) {
+    if (tokenRecord) {
+      if (tokenRecord.email !== cleanEmail) return false;
+      if (Date.now() > tokenRecord.expiresAt) {
+        this.verifiedTokens.delete(token);
+        return false;
+      }
       this.verifiedTokens.delete(token);
-      return false;
+      const firestore = getAdminFirestore();
+      if (firestore) {
+        firestore.collection('verification_tokens').doc(token).delete().catch(() => {});
+      }
+      return true;
     }
 
-    // Single-use: delete immediately
-    this.verifiedTokens.delete(token);
-    return true;
+    return false;
+  }
+
+  public async consumeVerificationTokenAsync(token: string, email: string): Promise<boolean> {
+    if (!token || typeof token !== 'string') return false;
+    const cleanEmail = (email || '').trim().toLowerCase();
+
+    // 1. Check in memory
+    const inMem = this.consumeVerificationToken(token, cleanEmail);
+    if (inMem) return true;
+
+    // 2. Check Firestore
+    const firestore = getAdminFirestore();
+    if (firestore) {
+      try {
+        const docRef = firestore.collection('verification_tokens').doc(token);
+        const snap = await docRef.get();
+        if (snap.exists) {
+          const data = snap.data() as VerificationTokenRecord;
+          await docRef.delete();
+          if (data && data.email === cleanEmail && Date.now() <= data.expiresAt) {
+            return true;
+          }
+        }
+      } catch (err) {
+        console.warn('[Firestore Admin] Notice consumeVerificationTokenAsync:', err);
+      }
+    }
+
+    return false;
   }
 }
 

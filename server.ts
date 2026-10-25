@@ -121,7 +121,7 @@ function requireAdmin(req: express.Request, res: express.Response, next: express
 // Register a new user
 // Note: Public registration only allows 'atleta' or 'entrenador'.
 // Creating an 'admin' account is strictly prohibited through public registration.
-app.post("/api/auth/register", (req, res) => {
+app.post("/api/auth/register", async (req, res) => {
   try {
     const {
       id,
@@ -165,7 +165,7 @@ app.post("/api/auth/register", (req, res) => {
       });
     }
 
-    const isTokenValid = verificationService.consumeVerificationToken(verificationToken, cleanEmail);
+    const isTokenValid = await verificationService.consumeVerificationTokenAsync(verificationToken, cleanEmail);
     if (!isTokenValid) {
       return res.status(403).json({
         success: false,
@@ -536,7 +536,7 @@ app.post("/api/auth/forgot-password/verify-code", async (req, res) => {
 });
 
 // Password Reset: Apply new password
-app.post("/api/auth/forgot-password/reset", (req, res) => {
+app.post("/api/auth/forgot-password/reset", async (req, res) => {
   try {
     const { email, newPassword, verificationToken } = req.body || {};
     if (!email || !newPassword || newPassword.length < 6) {
@@ -549,7 +549,7 @@ app.post("/api/auth/forgot-password/reset", (req, res) => {
     const cleanEmail = email.trim().toLowerCase();
 
     if (verificationToken) {
-      const isValid = verificationService.consumeVerificationToken(verificationToken, cleanEmail);
+      const isValid = await verificationService.consumeVerificationTokenAsync(verificationToken, cleanEmail);
       if (!isValid) {
         return res.status(403).json({
           success: false,
@@ -559,7 +559,7 @@ app.post("/api/auth/forgot-password/reset", (req, res) => {
       }
     }
 
-    const user = serverDatabase.findUserByEmail(cleanEmail);
+    const user = await serverDatabase.findUserByEmailAsync(cleanEmail);
     if (user) {
       serverDatabase.adminResetPassword(user.id, newPassword);
     }

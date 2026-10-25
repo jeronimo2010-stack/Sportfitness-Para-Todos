@@ -1,4 +1,5 @@
 import { verificarCodigo } from '../../server/db.js';
+import { getAdminFirestore } from '../../server/firebaseAdmin.js';
 import crypto from 'crypto';
 
 export default async function handler(req: any, res: any) {
@@ -35,6 +36,18 @@ export default async function handler(req: any, res: any) {
     try {
       const result = await verificarCodigo(cleanEmail, cleanCode);
       const verificationToken = `vtok_${crypto.randomBytes(24).toString('hex')}`;
+
+      // Persist verification token in Firestore for cross-lambda consumption
+      const firestore = getAdminFirestore();
+      if (firestore) {
+        await firestore.collection('verification_tokens').doc(verificationToken).set({
+          token: verificationToken,
+          email: cleanEmail,
+          purpose: 'verification',
+          expiresAt: Date.now() + 10 * 60 * 1000,
+          createdAt: Date.now(),
+        }).catch((err) => console.warn('[Firestore Admin] Notice saving verificationToken:', err));
+      }
 
       return res.status(200).json({
         success: true,
