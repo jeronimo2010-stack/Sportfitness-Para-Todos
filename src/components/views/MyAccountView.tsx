@@ -32,6 +32,7 @@ import { localDatabase } from '../../db/localDatabase';
 import { SwitchAccountModal } from '../common/SwitchAccountModal';
 import { ScrollReveal } from '../common/ScrollReveal';
 import { UserAvatar } from '../common/UserAvatar';
+import { PersonalRecordsFolderManager } from '../dashboard/PersonalRecordsFolderManager';
 
 export const MyAccountView: React.FC = () => {
   const { user, setUser, t, navigateTo, deleteCurrentAccount, logout, language, theme } = useApp();
@@ -89,41 +90,6 @@ export const MyAccountView: React.FC = () => {
   if (currentBmi < 18.5) bmiCategory = language === 'en' ? 'Underweight' : 'Bajo Peso';
   else if (currentBmi >= 25 && currentBmi < 30) bmiCategory = language === 'en' ? 'Functional Overweight' : 'Sobrepeso Funcional';
   else if (currentBmi >= 30) bmiCategory = language === 'en' ? 'High Density' : 'Densidad Elevada';
-
-  // Strength personal records based on body weight
-  const personalRecords = useMemo(() => {
-    const w = user.weight || 75;
-    return [
-      {
-        exercise: language === 'en' ? 'Back Squat' : 'Sentadilla Trasera',
-        weightKg: Math.round(w * 1.45),
-        reps: '1RM',
-        progress: '+5 kg',
-        date: '2026-09-18',
-      },
-      {
-        exercise: language === 'en' ? 'Leg Press 45°' : 'Prensa de Piernas 45°',
-        weightKg: Math.round(w * 2.8),
-        reps: '8 reps',
-        progress: '+10 kg',
-        date: '2026-09-15',
-      },
-      {
-        exercise: language === 'en' ? 'Romanian Deadlift' : 'Peso Muerto Rumano',
-        weightKg: Math.round(w * 1.3),
-        reps: '6 reps',
-        progress: '+2.5 kg',
-        date: '2026-09-12',
-      },
-      {
-        exercise: language === 'en' ? 'Bench Press' : 'Press de Banca Plano',
-        weightKg: Math.round(w * 1.05),
-        reps: '1RM',
-        progress: '+2.5 kg',
-        date: '2026-09-08',
-      },
-    ];
-  }, [user.weight, language]);
 
   // Handle Anthropometric Save
   const handleSaveHealthProfile = async (e: React.FormEvent) => {
@@ -725,55 +691,13 @@ export const MyAccountView: React.FC = () => {
             </div>
           </div>
 
-          {/* Strength Personal Records & Milestones */}
-          <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-6 shadow-sm space-y-4">
-            <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-3">
-              <div>
-                <h3 className="text-base font-bold text-zinc-900 dark:text-white flex items-center gap-2">
-                  <Award className="w-4 h-4 text-[#56A867]" />
-                  <span>{language === 'en' ? 'Strength Milestones & Personal Records' : 'Marcas de Fuerza & Récords Personales'}</span>
-                </h3>
-                <p className="text-xs text-zinc-500">
-                  {language === 'en' ? '1RM and maximum volume records tailored to your body weight' : 'Estimaciones 1RM y marcas máximas calibradas a tu peso corporal'}
-                </p>
-              </div>
-              <button
-                onClick={() => navigateTo('live-workout')}
-                className="text-xs font-bold text-[#56A867] hover:underline flex items-center gap-1 cursor-pointer"
-              >
-                <Zap className="w-3.5 h-3.5" />
-                <span>{language === 'en' ? 'Test 1RM' : 'Probar 1RM'}</span>
-              </button>
-            </div>
-
-            <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
-              {personalRecords.map((pr, idx) => (
-                <div
-                  key={idx}
-                  className="p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200/60 dark:border-zinc-800 flex items-center justify-between"
-                >
-                  <div>
-                    <p className="text-sm font-bold text-zinc-900 dark:text-white">
-                      {pr.exercise}
-                    </p>
-                    <div className="flex items-center gap-3 text-xs text-zinc-500 mt-0.5">
-                      <span>{pr.date}</span>
-                      <span>•</span>
-                      <span className="font-mono text-[#56A867] font-semibold">{pr.reps}</span>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-base font-mono font-black text-zinc-900 dark:text-white block">
-                      {pr.weightKg} kg
-                    </span>
-                    <span className="text-[11px] font-mono text-emerald-500 font-bold">
-                      {pr.progress}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+          {/* Strength Personal Records & Folder System */}
+          <PersonalRecordsFolderManager
+            user={user}
+            language={language}
+            onNavigateToWorkout={() => navigateTo('live-workout')}
+            variant="card"
+          />
         </div>
       </div>
     </ScrollReveal>

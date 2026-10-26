@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { UserProfile, DocumentType, StoredCredentialRecord, UserRole, UserNote, ScheduledSession, DayCalendarOverride } from '../types';
+import { UserProfile, DocumentType, StoredCredentialRecord, UserRole, UserNote, ScheduledSession, DayCalendarOverride, PersonalRecordFolder, PersonalStrengthRecord } from '../types';
 import { initialCalendarSessions } from '../data/initialData';
 
 const STORAGE_KEYS = {
@@ -17,6 +17,8 @@ const STORAGE_KEYS = {
   USER_NOTES: 'sportfitness_user_notes_v3',
   CALENDAR_SESSIONS: 'sportfitness_calendar_sessions_v3',
   CALENDAR_OVERRIDES: 'sportfitness_calendar_overrides_v3',
+  PERSONAL_RECORDS: 'sportfitness_personal_records_v3',
+  RECORD_FOLDERS: 'sportfitness_record_folders_v3',
 };
 
 export const INITIAL_CREDENTIAL_RECORDS: StoredCredentialRecord[] = [];
@@ -1161,5 +1163,168 @@ export const localDatabase = {
       sessions: initialCalendarSessions,
       overrides: {},
     };
+  },
+
+  // --- PERSONAL RECORDS & FOLDER SYSTEM ---
+  getRecordFolders(userId: string): PersonalRecordFolder[] {
+    try {
+      const raw = localStorage.getItem(`${STORAGE_KEYS.RECORD_FOLDERS}_${userId}`);
+      if (!raw) {
+        const defaultFolders: PersonalRecordFolder[] = [
+          {
+            id: `fld-${userId}-piernas`,
+            userId,
+            name: 'Tren Inferior (Piernas)',
+            icon: 'dumbbell',
+            color: '#56A867',
+            createdAt: new Date().toISOString(),
+          },
+          {
+            id: `fld-${userId}-empuje`,
+            userId,
+            name: 'Tren Superior (Empuje)',
+            icon: 'zap',
+            color: '#38BDF8',
+            createdAt: new Date().toISOString(),
+          },
+          {
+            id: `fld-${userId}-traccion`,
+            userId,
+            name: 'Espalda & Tracción',
+            icon: 'flame',
+            color: '#F59E0B',
+            createdAt: new Date().toISOString(),
+          },
+          {
+            id: `fld-${userId}-power`,
+            userId,
+            name: 'Powerlifting (Básicos)',
+            icon: 'award',
+            color: '#EC4899',
+            createdAt: new Date().toISOString(),
+          },
+        ];
+        localStorage.setItem(`${STORAGE_KEYS.RECORD_FOLDERS}_${userId}`, JSON.stringify(defaultFolders));
+        return defaultFolders;
+      }
+      return JSON.parse(raw);
+    } catch {
+      return [];
+    }
+  },
+
+  saveRecordFolders(userId: string, folders: PersonalRecordFolder[]): void {
+    try {
+      localStorage.setItem(`${STORAGE_KEYS.RECORD_FOLDERS}_${userId}`, JSON.stringify(folders));
+    } catch (e) {
+      console.error('Error saving record folders to localDatabase', e);
+    }
+  },
+
+  addRecordFolder(userId: string, folder: { name: string; color?: string; icon?: string }): PersonalRecordFolder {
+    const folders = this.getRecordFolders(userId);
+    const newFolder: PersonalRecordFolder = {
+      id: `fld-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      userId,
+      name: folder.name.trim() || 'Nueva Carpeta',
+      color: folder.color || '#56A867',
+      icon: folder.icon || 'folder',
+      createdAt: new Date().toISOString(),
+    };
+    folders.push(newFolder);
+    this.saveRecordFolders(userId, folders);
+    return newFolder;
+  },
+
+  deleteRecordFolder(userId: string, folderId: string): boolean {
+    const folders = this.getRecordFolders(userId);
+    const filtered = folders.filter((f) => f.id !== folderId);
+    if (filtered.length !== folders.length) {
+      this.saveRecordFolders(userId, filtered);
+      // Unlink records from this folder
+      const records = this.getPersonalRecords(userId);
+      let updated = false;
+      const unlinked = records.map((r) => {
+        if (r.folderId === folderId) {
+          updated = true;
+          return { ...r, folderId: undefined };
+        }
+        return r;
+      });
+      if (updated) {
+        this.savePersonalRecords(userId, unlinked);
+      }
+      return true;
+    }
+    return false;
+  },
+
+  getPersonalRecords(userId: string): PersonalStrengthRecord[] {
+    try {
+      const raw = localStorage.getItem(`${STORAGE_KEYS.PERSONAL_RECORDS}_${userId}`);
+      if (!raw) {
+        // Strict requirement: No automatic or fake records! Returns empty list.
+        return [];
+      }
+      return JSON.parse(raw);
+    } catch {
+      return [];
+    }
+  },
+
+  savePersonalRecords(userId: string, records: PersonalStrengthRecord[]): void {
+    try {
+      localStorage.setItem(`${STORAGE_KEYS.PERSONAL_RECORDS}_${userId}`, JSON.stringify(records));
+    } catch (e) {
+      console.error('Error saving personal records to localDatabase', e);
+    }
+  },
+
+  addPersonalRecord(
+    userId: string,
+    record: Omit<PersonalStrengthRecord, 'id' | 'userId' | 'createdAt'>
+  ): PersonalStrengthRecord {
+    const records = this.getPersonalRecords(userId);
+    const newRecord: PersonalStrengthRecord = {
+      id: `rec-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      userId,
+      exercise: record.exercise.trim(),
+      weightKg: Number(record.weightKg) || 0,
+      reps: record.reps || '1RM',
+      progress: record.progress ? record.progress.trim() : undefined,
+      date: record.date || new Date().toISOString().split('T')[0],
+      folderId: record.folderId,
+      notes: record.notes ? record.notes.trim() : undefined,
+      createdAt: new Date().toISOString(),
+    };
+    records.unshift(newRecord);
+    this.savePersonalRecords(userId, records);
+    return newRecord;
+  },
+
+  updatePersonalRecord(
+    userId: string,
+    recordId: string,
+    updates: Partial<PersonalStrengthRecord>
+  ): PersonalStrengthRecord | null {
+    const records = this.getPersonalRecords(userId);
+    const idx = records.findIndex((r) => r.id === recordId);
+    if (idx < 0) return null;
+    records[idx] = {
+      ...records[idx],
+      ...updates,
+    };
+    this.savePersonalRecords(userId, records);
+    return records[idx];
+  },
+
+  deletePersonalRecord(userId: string, recordId: string): boolean {
+    const records = this.getPersonalRecords(userId);
+    const filtered = records.filter((r) => r.id !== recordId);
+    if (filtered.length !== records.length) {
+      this.savePersonalRecords(userId, filtered);
+      return true;
+    }
+    return false;
   },
 };

@@ -38,6 +38,7 @@ import { useApp } from '../../context/AppContext';
 import { localDatabase } from '../../db/localDatabase';
 import { ScrollReveal, StaggerContainer, StaggerItem } from '../common/ScrollReveal';
 import { AthleteNotesWidget } from '../dashboard/AthleteNotesWidget';
+import { PersonalRecordsFolderManager } from '../dashboard/PersonalRecordsFolderManager';
 
 interface AthleteDashboardViewProps {
   onNavigate: (screen: ScreenId) => void;
@@ -262,75 +263,6 @@ export const AthleteDashboardView: React.FC<AthleteDashboardViewProps> = ({
       overloadIncrementKg: isZeroState ? 0 : overloadIncrementKg,
     };
   }, [squatLoad, legPressLoad, rdlLoad, starterExercise, progressiveOverloadFactor, user.weight, isZeroState]);
-
-  // Tabla 1: Control de Fuerza & Estimación 1RM (Fuerza Máxima y Cargas Efectivas)
-  const strengthTableData = useMemo(() => {
-    const w = user.weight || 75;
-
-    const baseExercises = [
-      {
-        id: 'squat',
-        name: 'Sentadilla Trasera con Barra',
-        targetMuscle: 'Cuádriceps & Glúteo Mayor',
-        baseWorkingKg: Math.round(w * 0.95),
-        sets: 4,
-        reps: 8,
-        rpeTarget: 'RPE 8.0 (2 RIR)',
-        weeklyOverload: '+2.5% (+2.0 kg/sem)',
-      },
-      {
-        id: 'bench',
-        name: 'Press de Banca Plano',
-        targetMuscle: 'Pectoral Mayor & Tríceps',
-        baseWorkingKg: Math.round(w * 0.75),
-        sets: 4,
-        reps: 8,
-        rpeTarget: 'RPE 8.5 (1.5 RIR)',
-        weeklyOverload: '+2.5% (+1.5 kg/sem)',
-      },
-      {
-        id: 'rdl',
-        name: 'Peso Muerto Rumano (RDL)',
-        targetMuscle: 'Isquiosurales & Glúteos',
-        baseWorkingKg: Math.round(w * 1.05),
-        sets: 3,
-        reps: 10,
-        rpeTarget: 'RPE 7.5 (2.5 RIR)',
-        weeklyOverload: '+2.5% (+2.5 kg/sem)',
-      },
-      {
-        id: 'ohp',
-        name: 'Press Militar Estricto',
-        targetMuscle: 'Deltoides Medial & Core',
-        baseWorkingKg: Math.round(w * 0.50),
-        sets: 4,
-        reps: 8,
-        rpeTarget: 'RPE 8.0 (2 RIR)',
-        weeklyOverload: '+2.5% (+1.0 kg/sem)',
-      },
-      {
-        id: 'row',
-        name: 'Remo con Barra Prono',
-        targetMuscle: 'Dorsal Ancho & Romboides',
-        baseWorkingKg: Math.round(w * 0.70),
-        sets: 4,
-        reps: 10,
-        rpeTarget: 'RPE 8.0 (2 RIR)',
-        weeklyOverload: '+2.5% (+1.5 kg/sem)',
-      },
-    ];
-
-    return baseExercises.map((ex) => {
-      const workingWeightKg = isZeroState ? ex.baseWorkingKg : Math.round(ex.baseWorkingKg * progressiveOverloadFactor);
-      // 1RM Brzycki formula: weight / (1.0278 - 0.0278 * reps)
-      const estimatedOneRmKg = Math.round(workingWeightKg / (1.0278 - 0.0278 * ex.reps));
-      return {
-        ...ex,
-        workingWeightKg,
-        estimatedOneRmKg,
-      };
-    });
-  }, [user.weight, progressiveOverloadFactor, isZeroState]);
 
   // Tabla 2: Registro de Progresión de Sobrecarga Dinámica (Semana a Semana)
   const progressiveOverloadCycle = useMemo(() => {
@@ -1112,83 +1044,14 @@ export const AthleteDashboardView: React.FC<AthleteDashboardViewProps> = ({
       {/* TABLAS DE CONTROL DE FUERZA & CARGA PROGRESIVA DINÁMICA */}
       <ScrollReveal direction="up" delay={0.09} duration={0.5}>
         <div className="space-y-6">
-          {/* TABLA 1: CONTROL DE FUERZA Y ESTIMACIÓN 1RM */}
-          <div className="p-5 sm:p-6 rounded-2xl bg-[#121218] border border-[#20202A] space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#20202A]">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-[#56A867]/15 text-[#56A867]">
-                  <Dumbbell className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-white font-serif uppercase tracking-wider flex items-center gap-2">
-                    <span>{language === 'en' ? 'Strength Tracking & 1RM Estimates' : 'Tabla de Control de Fuerza & Estimación 1RM'}</span>
-                    <span className="px-2 py-0.5 rounded-full bg-[#56A867]/20 text-[#56A867] text-[10px] font-mono font-bold">
-                      Fórmula Brzycki
-                    </span>
-                  </h3>
-                  <p className="text-[11px] text-[#8E8E9E]">
-                    {language === 'en'
-                      ? 'Target working loads, planned volume, and calculated 1RM based on athlete bodyweight and active overload.'
-                      : 'Cargas efectivas de trabajo, series × repeticiones y 1RM calculado a partir del peso corporal del atleta.'}
-                  </p>
-                </div>
-              </div>
+          {/* GESTIÓN DE MARCAS, 1RM & CARPETAS DE FUERZA (SIN REGISTROS AUTOMÁTICOS) */}
+          <PersonalRecordsFolderManager
+            user={user}
+            language={language}
+            onNavigateToWorkout={() => onNavigate('live-workout')}
+            variant="section"
+          />
 
-              <div className="flex items-center gap-2 text-xs font-mono text-[#56A867] bg-[#161622] px-3 py-1 rounded-xl border border-[#242436]">
-                <TrendingUp className="w-4 h-4" />
-                <span>
-                  {language === 'en' ? 'Active Overload:' : 'Sobrecarga Activa:'}{' '}
-                  <strong>+{isZeroState ? 0 : Math.round((progressiveOverloadFactor - 1) * 100 * 10) / 10}%</strong>
-                </span>
-              </div>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs font-mono border-collapse">
-                <thead>
-                  <tr className="border-b border-[#242436] text-[#8E8E9E] uppercase text-[10px] tracking-wider">
-                    <th className="py-2.5 px-3">{language === 'en' ? 'Exercise' : 'Ejercicio'}</th>
-                    <th className="py-2.5 px-3">{language === 'en' ? 'Target Muscle' : 'Músculo Principal'}</th>
-                    <th className="py-2.5 px-3 text-center">{language === 'en' ? 'Working Weight' : 'Carga de Trabajo'}</th>
-                    <th className="py-2.5 px-3 text-center">{language === 'en' ? 'Sets × Reps' : 'Series × Reps'}</th>
-                    <th className="py-2.5 px-3 text-center text-[#56A867]">{language === 'en' ? 'Estimated 1RM' : '1RM Estimado'}</th>
-                    <th className="py-2.5 px-3 text-center">{language === 'en' ? 'Target RPE' : 'RPE Objetivo'}</th>
-                    <th className="py-2.5 px-3 text-right">{language === 'en' ? 'Progression Rule' : 'Regla de Aumento'}</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#1D1D2A] text-neutral-200">
-                  {strengthTableData.map((item) => (
-                    <tr key={item.id} className="hover:bg-[#161622]/60 transition-colors">
-                      <td className="py-3 px-3 font-bold text-white flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#56A867]" />
-                        <span>{item.name}</span>
-                      </td>
-                      <td className="py-3 px-3 text-[#9E9EA8]">{item.targetMuscle}</td>
-                      <td className="py-3 px-3 text-center font-bold text-white">
-                        <span className="px-2 py-1 rounded-lg bg-[#181824] border border-[#28283C]">
-                          {item.workingWeightKg} kg
-                        </span>
-                      </td>
-                      <td className="py-3 px-3 text-center text-[#A0A0B0]">
-                        {item.sets} × {item.reps}
-                      </td>
-                      <td className="py-3 px-3 text-center font-bold text-[#56A867]">
-                        <span className="px-2 py-1 rounded-lg bg-[#56A867]/10 border border-[#56A867]/30">
-                          {item.estimatedOneRmKg} kg
-                        </span>
-                      </td>
-                      <td className="py-3 px-3 text-center text-[#C0C0D0]">
-                        {item.rpeTarget}
-                      </td>
-                      <td className="py-3 px-3 text-right text-emerald-400 font-semibold">
-                        {item.weeklyOverload}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
 
           {/* TABLA 2: REGISTRO DE PROGRESIÓN DE SOBRECARGA DINÁMICA (SEMANA A SEMANA) */}
           <div className="p-5 sm:p-6 rounded-2xl bg-[#121218] border border-[#20202A] space-y-4">

@@ -384,3 +384,25 @@ export interface ChatMessage {
     actionTarget?: ScreenId;
   };
 }
+
+export interface PersonalRecordFolder {
+  id: string;
+  userId: string;
+  name: string;
+  icon?: string;
+  color?: string;
+  createdAt: string;
+}
+
+export interface PersonalStrengthRecord {
+  id: string;
+  userId: string;
+  exercise: string;
+  weightKg: number;
+  reps: string;
+  progress?: string;
+  date: string;
+  folderId?: string;
+  notes?: string;
+  createdAt: string;
+}
