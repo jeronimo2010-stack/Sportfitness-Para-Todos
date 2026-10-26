@@ -1,6 +1,19 @@
 import { verificarCodigo } from '../../server/db.js';
+import { verificationService } from '../../server/verificationService.js';
 import { getAdminFirestore } from '../../server/firebaseAdmin.js';
-import crypto from 'crypto';
+
+function parseCookies(cookieHeader?: string): Record<string, string> {
+  const list: Record<string, string> = {};
+  if (!cookieHeader) return list;
+  cookieHeader.split(';').forEach((cookie) => {
+    const [name, ...rest] = cookie.split('=');
+    const cleanName = name?.trim();
+    if (!cleanName) return;
+    const value = rest.join('=').trim();
+    list[cleanName] = decodeURIComponent(value);
+  });
+  return list;
+}
 
 export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -21,7 +34,7 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    const { email, code } = req.body || {};
+    const { email, code, pendingToken: bodyPendingToken } = req.body || {};
 
     if (!email || !code) {
       return res.status(400).json({ success: false, error: 'Email y código son requeridos.' });
@@ -33,18 +46,24 @@ export default async function handler(req: any, res: any) {
       return res.status(400).json({ success: false, error: 'El código debe tener 6 dígitos.' });
     }
 
-    try {
-      const result = await verificarCodigo(cleanEmail, cleanCode);
-      const verificationToken = `vtok_${crypto.randomBytes(24).toString('hex')}`;
+    const cookies = parseCookies(req.headers.cookie);
+    const pendingToken = bodyPendingToken || cookies['sf_verify_state'];
 
-      // Persist verification token in Firestore for cross-lambda consumption
+    try {
+      const result = await verificarCodigo(cleanEmail, cleanCode, pendingToken);
+      const verificationToken = verificationService.generateSignedVerificationToken(cleanEmail, 'verification');
+
+      // Clear the pending verification state cookie
+      res.setHeader('Set-Cookie', 'sf_verify_state=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax');
+
+      // Persist verification token in Firestore for cross-lambda consumption if available
       const firestore = getAdminFirestore();
       if (firestore) {
         await firestore.collection('verification_tokens').doc(verificationToken).set({
           token: verificationToken,
           email: cleanEmail,
           purpose: 'verification',
-          expiresAt: Date.now() + 10 * 60 * 1000,
+          expiresAt: Date.now() + 15 * 60 * 1000,
           createdAt: Date.now(),
         }).catch((err) => console.warn('[Firestore Admin] Notice saving verificationToken:', err));
       }

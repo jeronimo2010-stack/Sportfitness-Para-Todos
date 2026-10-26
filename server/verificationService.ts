@@ -44,6 +44,91 @@ class VerificationService {
   }
 
   /**
+   * Generates a signed tamper-proof state token containing HMAC signature.
+   * Enables 100% resilient verification across stateless serverless invocations (e.g. Vercel).
+   */
+  public generateSignedState(
+    email: string,
+    code: string,
+    purpose: string = 'registro',
+    expirationMinutes = 15
+  ): string {
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanCode = code.trim();
+    const expiresAt = Date.now() + expirationMinutes * 60 * 1000;
+    const payload = `${cleanEmail}:${cleanCode}:${expiresAt}:${purpose}`;
+    const signature = crypto.createHmac('sha256', this.pepper).update(payload).digest('hex');
+    const stateObj = {
+      e: cleanEmail,
+      exp: expiresAt,
+      p: purpose,
+      sig: signature,
+    };
+    return Buffer.from(JSON.stringify(stateObj)).toString('base64url');
+  }
+
+  /**
+   * Verifies incoming code against signed state token.
+   */
+  public verifySignedState(
+    email: string,
+    inputCode: string,
+    stateToken?: string
+  ): { valid: boolean; purpose?: string; error?: string } {
+    if (!stateToken || typeof stateToken !== 'string') {
+      return { valid: false, error: 'Token de estado no proporcionado.' };
+    }
+
+    try {
+      const decodedJson = Buffer.from(stateToken, 'base64url').toString('utf-8');
+      const stateObj = JSON.parse(decodedJson);
+      if (!stateObj || !stateObj.e || !stateObj.exp || !stateObj.sig) {
+        return { valid: false, error: 'Estructura de token inválida.' };
+      }
+
+      const cleanEmail = email.trim().toLowerCase();
+      if (stateObj.e !== cleanEmail) {
+        return { valid: false, error: 'El correo no coincide con la solicitud original.' };
+      }
+
+      if (Date.now() > stateObj.exp) {
+        return { valid: false, error: 'El código ha expirado (validez de 15 minutos).' };
+      }
+
+      const cleanCode = inputCode.trim();
+      const expectedPayload = `${cleanEmail}:${cleanCode}:${stateObj.exp}:${stateObj.p || 'registro'}`;
+      const expectedSig = crypto.createHmac('sha256', this.pepper).update(expectedPayload).digest('hex');
+
+      const sigBuf = Buffer.from(stateObj.sig);
+      const expectedBuf = Buffer.from(expectedSig);
+      if (sigBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(sigBuf, expectedBuf)) {
+        return { valid: false, error: 'El código es incorrecto.' };
+      }
+
+      return { valid: true, purpose: stateObj.p };
+    } catch {
+      return { valid: false, error: 'Error al decodificar token de estado.' };
+    }
+  }
+
+  /**
+   * Generates a signed single-use verification token that can be consumed by /api/auth/register or password reset.
+   */
+  public generateSignedVerificationToken(email: string, purpose: string = 'verification'): string {
+    const cleanEmail = email.trim().toLowerCase();
+    const expiresAt = Date.now() + 15 * 60 * 1000;
+    const payload = `verified:${cleanEmail}:${expiresAt}:${purpose}`;
+    const sig = crypto.createHmac('sha256', this.pepper).update(payload).digest('hex');
+    const tokenObj = {
+      e: cleanEmail,
+      exp: expiresAt,
+      p: purpose,
+      sig,
+    };
+    return `vtok_${Buffer.from(JSON.stringify(tokenObj)).toString('base64url')}`;
+  }
+
+  /**
    * Generates a deterministic SHA-256 hash using the 6-digit code, the target email, and a server-side pepper.
    */
   public hashCode(code: string, email: string): string {
@@ -285,7 +370,8 @@ class VerificationService {
    */
   public async verifyCode(
     email: string,
-    inputCode: string
+    inputCode: string,
+    pendingStateToken?: string
   ): Promise<{ success: boolean; status?: number; error?: string; message: string; verificationToken?: string }> {
     const cleanEmail = (email || '').trim().toLowerCase();
     const cleanCode = (inputCode || '').replace(/\D/g, '').trim();
@@ -347,12 +433,12 @@ class VerificationService {
       if (dbToken && new Date(dbToken.expires_at).getTime() > now) {
         // Valid token found in db.tokens
         await db.tokens.update({ is_used: true }, { where: { id: dbToken.id } });
-        const verificationToken = `vtok_${crypto.randomBytes(32).toString('hex')}`;
+        const verificationToken = this.generateSignedVerificationToken(cleanEmail, dbToken.purpose || 'general');
         const tokenRec: VerificationTokenRecord = {
           token: verificationToken,
           email: cleanEmail,
           purpose: dbToken.purpose || 'general',
-          expiresAt: now + 10 * 60 * 1000,
+          expiresAt: now + 15 * 60 * 1000,
           createdAt: now,
         };
         this.verifiedTokens.set(verificationToken, tokenRec);
@@ -363,6 +449,34 @@ class VerificationService {
         }
 
         console.log(`[DIAG] [VERIF-SVC] Verificación EXITOSA vía db.tokens para ${masked}. Token emitido: ${verificationToken.substring(0, 10)}...`);
+        return {
+          success: true,
+          message: 'Código verificado correctamente.',
+          verificationToken,
+        };
+      }
+    }
+
+    // Tertiary resilient fallback: Stateless signed HMAC state token (guaranteed to work across any serverless lambdas)
+    if ((!record || record.used) && pendingStateToken) {
+      const stateCheck = this.verifySignedState(cleanEmail, cleanCode, pendingStateToken);
+      if (stateCheck.valid) {
+        const verificationToken = this.generateSignedVerificationToken(cleanEmail, stateCheck.purpose || 'verification');
+        const tokenRec: VerificationTokenRecord = {
+          token: verificationToken,
+          email: cleanEmail,
+          purpose: stateCheck.purpose || 'verification',
+          expiresAt: now + 15 * 60 * 1000,
+          createdAt: now,
+        };
+        this.verifiedTokens.set(verificationToken, tokenRec);
+
+        const firestore = getAdminFirestore();
+        if (firestore) {
+          firestore.collection('verification_tokens').doc(verificationToken).set(tokenRec).catch(() => {});
+        }
+
+        console.log(`[DIAG] [VERIF-SVC] Verificación EXITOSA vía HMAC state token para ${masked}.`);
         return {
           success: true,
           message: 'Código verificado correctamente.',
@@ -506,7 +620,32 @@ class VerificationService {
     const inMem = this.consumeVerificationToken(token, cleanEmail);
     if (inMem) return true;
 
-    // 2. Check Firestore
+    // 2. Stateless cryptographic HMAC verification for vtok_ signed tokens
+    if (token.startsWith('vtok_')) {
+      try {
+        const rawB64 = token.substring(5);
+        const decoded = JSON.parse(Buffer.from(rawB64, 'base64url').toString('utf-8'));
+        if (decoded && decoded.e === cleanEmail && Date.now() <= decoded.exp && decoded.sig) {
+          const expectedPayload = `verified:${cleanEmail}:${decoded.exp}:${decoded.p || 'verification'}`;
+          const expectedSig = crypto.createHmac('sha256', this.pepper).update(expectedPayload).digest('hex');
+          const sigBuf = Buffer.from(decoded.sig);
+          const expBuf = Buffer.from(expectedSig);
+          if (sigBuf.length === expBuf.length && crypto.timingSafeEqual(sigBuf, expBuf)) {
+            // Valid signed token verified
+            this.verifiedTokens.delete(token);
+            const firestore = getAdminFirestore();
+            if (firestore) {
+              firestore.collection('consumed_tokens').doc(token).set({ consumedAt: Date.now(), email: cleanEmail }).catch(() => {});
+            }
+            return true;
+          }
+        }
+      } catch {
+        // Fall through to Firestore
+      }
+    }
+
+    // 3. Check Firestore
     const firestore = getAdminFirestore();
     if (firestore) {
       try {

@@ -498,6 +498,12 @@ class AuthService {
         };
       }
 
+      if (data?.pendingVerificationToken) {
+        try {
+          sessionStorage.setItem('sf_pending_reg_token', data.pendingVerificationToken);
+        } catch {}
+      }
+
       return {
         success: true,
         message: data.message || `Código enviado exitosamente a ${cleanEmail}. Revisa tu bandeja de entrada o spam.`,
@@ -522,15 +528,23 @@ class AuthService {
     const cleanEmail = email.trim().toLowerCase();
     const cleanCode = code.replace(/\D/g, '').trim();
 
+    let pendingToken = '';
+    try {
+      pendingToken = sessionStorage.getItem('sf_pending_reg_token') || '';
+    } catch {}
+
     try {
       const response = await fetch('/api/auth/verify-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: cleanEmail, code: cleanCode }),
+        body: JSON.stringify({ email: cleanEmail, code: cleanCode, pendingToken }),
       });
       const data = await response.json().catch(() => null);
 
       if (response.ok && data?.success) {
+        try {
+          sessionStorage.removeItem('sf_pending_reg_token');
+        } catch {}
         return {
           success: true,
           message: data.message || 'Código verificado correctamente.',
@@ -578,6 +592,12 @@ class AuthService {
         };
       }
 
+      if (data?.pendingVerificationToken) {
+        try {
+          sessionStorage.setItem('sf_pending_reset_token', data.pendingVerificationToken);
+        } catch {}
+      }
+
       return {
         success: true,
         message: data.message || `Si la cuenta está registrada, recibirás un código de 6 dígitos.`,
@@ -601,15 +621,23 @@ class AuthService {
     const cleanEmail = email.trim().toLowerCase();
     const cleanCode = code.replace(/\D/g, '').trim();
 
+    let pendingToken = '';
+    try {
+      pendingToken = sessionStorage.getItem('sf_pending_reset_token') || '';
+    } catch {}
+
     try {
       const response = await fetch('/api/auth/forgot-password/verify-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: cleanEmail, code: cleanCode }),
+        body: JSON.stringify({ email: cleanEmail, code: cleanCode, pendingToken }),
       });
       const data = await response.json().catch(() => null);
 
       if (response.ok && data?.success) {
+        try {
+          sessionStorage.removeItem('sf_pending_reset_token');
+        } catch {}
         return {
           success: true,
           message: data.message || 'Código verificado correctamente.',

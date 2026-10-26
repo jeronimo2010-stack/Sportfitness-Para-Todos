@@ -4,6 +4,7 @@
  */
 
 import { db } from '../../server/db.js';
+import { verificationService } from '../../server/verificationService.js';
 
 const SENDGRID_API_KEY = (process.env.SENDGRID_API_KEY || '').trim();
 const SENDGRID_FROM_EMAIL = (process.env.SENDGRID_FROM_EMAIL || 'sportfitness112@gmail.com').trim();
@@ -39,6 +40,9 @@ export default async function handler(req: any, res: any) {
     const code = incomingCode && incomingCode.trim().length === 6
       ? incomingCode.trim()
       : Math.floor(100000 + Math.random() * 900000).toString();
+
+    // Generate cryptographic stateless verification state token
+    const pendingToken = verificationService.generateSignedState(cleanEmail, code, purpose, 15);
 
     try {
       await db.tokens.create({
@@ -140,11 +144,18 @@ Equipo de Seguridad Sportfitness
       body: JSON.stringify(payload),
     });
 
+    // Set cookie for stateless verification
+    res.setHeader(
+      'Set-Cookie',
+      `sf_verify_state=${pendingToken}; Path=/; Max-Age=900; SameSite=Lax`
+    );
+
     if (sgResponse.status >= 200 && sgResponse.status < 300) {
       return res.status(200).json({
         success: true,
         code,
-        message: `Código de verificación de 6 dígitos enviado exitosamente a ${cleanEmail}.`,
+        pendingVerificationToken: pendingToken,
+        message: `Código de verificación de 6 dígitos enviado exitosamente a ${cleanEmail}. Revisa tu bandeja de entrada o spam.`,
       });
     } else {
       const errText = await sgResponse.text();
@@ -152,6 +163,7 @@ Equipo de Seguridad Sportfitness
       return res.status(200).json({
         success: true,
         code,
+        pendingVerificationToken: pendingToken,
         warning: `SendGrid status ${sgResponse.status}`,
         message: `Código registrado para ${cleanEmail}.`,
       });

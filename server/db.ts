@@ -140,7 +140,8 @@ export const isServerless = Boolean(
   process.env.VERCEL ||
   process.env.AWS_LAMBDA_FUNCTION_NAME ||
   process.env.LAMBDA_TASK_ROOT ||
-  process.env.VERCEL_ENV
+  process.env.VERCEL_ENV ||
+  process.env.VERCEL_URL
 );
 
 async function saveUserToFirestore(user: DatabaseUser): Promise<void> {
@@ -402,10 +403,8 @@ class ServerDatabase {
     try {
       this.ensureDataDir();
       fs.writeFileSync(DB_FILE, JSON.stringify(this.db, null, 2), 'utf-8');
-    } catch (error: any) {
-      if (error?.code !== 'EROFS') {
-        console.warn('Error saving database to file:', error?.message || error);
-      }
+    } catch {
+      // In serverless / read-only filesystem environments, storage is handled in Firestore
     }
   }
 
@@ -1543,11 +1542,15 @@ export const db = serverDatabase;
  * 2. Comprobar si ha expirado (15 minutos)
  * 3. Marcar como usado inmediatamente
  */
-export async function verificarCodigo(email: string, codigoIngresado: string) {
+export async function verificarCodigo(
+  email: string,
+  codigoIngresado: string,
+  pendingToken?: string
+) {
   const cleanEmail = email.trim().toLowerCase();
   const cleanCode = codigoIngresado.trim();
 
-  // 1. Buscar el token activo y no expirado
+  // 1. Buscar el token activo y no expirado en Firestore o memoria
   const registroToken = await db.tokens.findOne({
     where: { 
       email: cleanEmail, 
@@ -1556,21 +1559,48 @@ export async function verificarCodigo(email: string, codigoIngresado: string) {
     }
   });
 
-  if (!registroToken) {
-    throw new Error("El código es incorrecto o ya ha sido utilizado.");
+  if (registroToken) {
+    // 2. Comprobar si ha expirado (15 minutos)
+    const ahora = new Date();
+    if (ahora > new Date(registroToken.expires_at)) {
+      throw new Error("El código ha expirado. Solicita uno nuevo.");
+    }
+
+    // 3. Marcar como usado inmediatamente
+    await db.tokens.update(
+      { is_used: true }, 
+      { where: { id: registroToken.id } }
+    );
+
+    return { success: true, message: "Código verificado correctamente." };
   }
 
-  // 2. Comprobar si ha expirado (15 minutos)
-  const ahora = new Date();
-  if (ahora > new Date(registroToken.expires_at)) {
-    throw new Error("El código ha expirado. Solicita uno nuevo.");
+  // 4. Verificación resiliente sin estado (HMAC) para Serverless Vercel
+  if (pendingToken && typeof pendingToken === 'string') {
+    try {
+      const decodedJson = Buffer.from(pendingToken, 'base64url').toString('utf-8');
+      const stateObj = JSON.parse(decodedJson);
+      if (stateObj && stateObj.e === cleanEmail && stateObj.exp && stateObj.sig) {
+        if (Date.now() > stateObj.exp) {
+          throw new Error("El código ha expirado. Solicita uno nuevo.");
+        }
+        const pepper = (
+          process.env.SECURITY_PEPPER ||
+          process.env.SESSION_SECRET ||
+          'sf_secure_pepper_2026_sportfitness_auth_hash'
+        ).trim();
+        const expectedPayload = `${cleanEmail}:${cleanCode}:${stateObj.exp}:${stateObj.p || 'registro'}`;
+        const expectedSig = crypto.createHmac('sha256', pepper).update(expectedPayload).digest('hex');
+        const sigBuf = Buffer.from(stateObj.sig);
+        const expBuf = Buffer.from(expectedSig);
+        if (sigBuf.length === expBuf.length && crypto.timingSafeEqual(sigBuf, expBuf)) {
+          return { success: true, message: "Código verificado correctamente." };
+        }
+      }
+    } catch (e: any) {
+      if (e.message && e.message.includes('expirado')) throw e;
+    }
   }
 
-  // 3. Marcar como usado inmediatamente
-  await db.tokens.update(
-    { is_used: true }, 
-    { where: { id: registroToken.id } }
-  );
-
-  return { success: true, message: "Código verificado correctamente." };
+  throw new Error("El código es incorrecto o ya ha sido utilizado.");
 }

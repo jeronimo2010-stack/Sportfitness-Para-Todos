@@ -58,14 +58,20 @@ export function initFirebaseAdmin(): App | null {
     const serviceAccountEnv = process.env.FIREBASE_SERVICE_ACCOUNT;
     const serviceAccount = parseServiceAccount(serviceAccountEnv);
 
+    const targetDatabaseId =
+      process.env.FIRESTORE_DATABASE_ID ||
+      'ai-studio-sportfitnesspara-13d1b18f-939a-4926-8fb2-9dc953e965e2';
+
     if (serviceAccount) {
       const app = initializeApp({
         credential: cert(serviceAccount),
         projectId: serviceAccount.projectId || (serviceAccount as any).project_id,
       });
-      firestoreInstance = getFirestore(app);
+      firestoreInstance = targetDatabaseId && targetDatabaseId !== '(default)'
+        ? getFirestore(app, targetDatabaseId)
+        : getFirestore(app);
       isInitialized = true;
-      console.log('[Firebase Admin] Successfully initialized with FIREBASE_SERVICE_ACCOUNT credentials.');
+      console.log(`[Firebase Admin] Successfully initialized with FIREBASE_SERVICE_ACCOUNT (database: ${targetDatabaseId}).`);
       return app;
     }
 
@@ -74,15 +80,17 @@ export function initFirebaseAdmin(): App | null {
       const app = initializeApp({
         credential: applicationDefault(),
       });
-      firestoreInstance = getFirestore(app);
+      firestoreInstance = targetDatabaseId && targetDatabaseId !== '(default)'
+        ? getFirestore(app, targetDatabaseId)
+        : getFirestore(app);
       isInitialized = true;
-      console.log('[Firebase Admin] Initialized with Application Default Credentials.');
+      console.log(`[Firebase Admin] Initialized with Application Default Credentials (database: ${targetDatabaseId}).`);
       return app;
     }
 
     // If neither is present, warn clearly
     console.warn(
-      '[Firebase Admin] FIREBASE_SERVICE_ACCOUNT is not set. Server database will operate with in-memory fallback.'
+      '[Firebase Admin] FIREBASE_SERVICE_ACCOUNT is not set. Server database will operate with resilient stateless verification.'
     );
     initError = 'FIREBASE_SERVICE_ACCOUNT environment variable is not defined.';
     return null;
