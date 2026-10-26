@@ -1,6 +1,6 @@
-import { verificarCodigo } from '../../../server/db.js';
-import { verificationService } from '../../../server/verificationService.js';
-import { getAdminFirestore } from '../../../server/firebaseAdmin.js';
+import { verificarCodigo } from '../../../server/db.ts';
+import { verificationService } from '../../../server/verificationService.ts';
+import { getAdminFirestore } from '../../../server/firebaseAdmin.ts';
 
 function parseCookies(cookieHeader?: string): Record<string, string> {
   const list: Record<string, string> = {};

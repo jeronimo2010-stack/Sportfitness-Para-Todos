@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
-import { getAdminFirestore, type Query } from './firebaseAdmin.js';
+import { getAdminFirestore, type Query } from './firebaseAdmin.ts';
 
 export interface UserHealthProfile {
   weight: number; // kg

@@ -1,7 +1,7 @@
 import crypto from 'crypto';
-import { emailService, maskEmail } from './emailService.js';
-import { db } from './db.js';
-import { getAdminFirestore } from './firebaseAdmin.js';
+import { emailService, maskEmail } from './emailService.ts';
+import { db } from './db.ts';
+import { getAdminFirestore } from './firebaseAdmin.ts';
 
 export interface VerificationRecord {
   email: string;

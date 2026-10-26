@@ -3,9 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { serverDatabase } from '../../server/db.js';
-import { verificationService } from '../../server/verificationService.js';
-import { emailService } from '../../server/emailService.js';
+import { serverDatabase } from '../../server/db.ts';
+import { verificationService } from '../../server/verificationService.ts';
+import { emailService } from '../../server/emailService.ts';
 
 export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Credentials', 'true');
