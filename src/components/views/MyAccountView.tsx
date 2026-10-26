@@ -178,12 +178,12 @@ export const MyAccountView: React.FC = () => {
     }
   };
 
-  // Computed metrics
-  const streakCount = progressData?.streakDays || user.streakDays || 0;
-  const activeDays = progressData?.activeDaysTotal || user.activeDaysTotal || Math.max(streakCount, 4);
-  const totalSessions = progressData?.sessionsCompleted || user.sessionsThisWeek || 0;
-  const totalVolume = progressData?.totalVolumeKg || 42500;
-  const workoutLogs = progressData?.workoutLogs || [];
+  // Computed metrics (Strictly actual user progress - never use fake/hardcoded fallbacks)
+  const streakCount = progressData?.streakDays ?? user.streakDays ?? 0;
+  const activeDays = progressData?.activeDaysTotal ?? user.activeDaysTotal ?? 0;
+  const totalSessions = progressData?.sessionsCompleted ?? user.sessionsThisWeek ?? 0;
+  const totalVolume = progressData?.totalVolumeKg ?? 0;
+  const workoutLogs = Array.isArray(progressData?.workoutLogs) ? progressData.workoutLogs : [];
 
   return (
     <div className="w-full max-w-7xl mx-auto px-4 py-8 space-y-8" id="my-account-module">
@@ -673,13 +673,19 @@ export const MyAccountView: React.FC = () => {
                         <span>{log.date}</span>
                         <span>•</span>
                         <span>{log.durationMinutes} min</span>
-                        <span>•</span>
-                        <span className="text-[#56A867] font-semibold">{log.tonnageRecordedKg || 1800} kg {language === 'en' ? 'load' : 'carga'}</span>
+                        {log.tonnageRecordedKg ? (
+                          <>
+                            <span>•</span>
+                            <span className="text-[#56A867] font-semibold">{log.tonnageRecordedKg} kg {language === 'en' ? 'load' : 'carga'}</span>
+                          </>
+                        ) : null}
                       </div>
                     </div>
-                    <span className="px-2 py-1 text-xs font-bold rounded bg-[#56A867]/20 text-[#448652] dark:text-[#56A867] border border-[#56A867]/30">
-                      Score {log.efficiencyScore || 92}%
-                    </span>
+                    {log.efficiencyScore ? (
+                      <span className="px-2 py-1 text-xs font-bold rounded bg-[#56A867]/20 text-[#448652] dark:text-[#56A867] border border-[#56A867]/30">
+                        Score {log.efficiencyScore}%
+                      </span>
+                    ) : null}
                   </div>
                 ))
               ) : (
