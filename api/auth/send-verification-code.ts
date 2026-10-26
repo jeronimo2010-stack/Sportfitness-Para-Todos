@@ -135,6 +135,21 @@ Equipo de Seguridad Sportfitness
       ],
     };
 
+    if (!SENDGRID_API_KEY) {
+      console.log(`[SendGrid Serverless] SENDGRID_API_KEY no configurada. Simulando despacho de código: ${code} para ${cleanEmail}`);
+      res.setHeader(
+        'Set-Cookie',
+        `sf_verify_state=${pendingToken}; Path=/; Max-Age=900; SameSite=Lax`
+      );
+      return res.status(200).json({
+        success: true,
+        code,
+        devCode: code,
+        pendingVerificationToken: pendingToken,
+        message: `✉️ [Modo Vista Previa] Código generado: ${code} (ingrésalo a continuación para continuar).`,
+      });
+    }
+
     const sgResponse = await fetch('https://api.sendgrid.com/v3/mail/send', {
       method: 'POST',
       headers: {

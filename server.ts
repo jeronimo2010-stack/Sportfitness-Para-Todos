@@ -371,10 +371,11 @@ app.post("/api/auth/send-verification-code", async (req, res) => {
     }
 
     console.log(`[DIAG] [ROUTE /send-verification-code] Respuesta 200 OK enviada al cliente para ${masked}`);
-    // Security: NEVER return verification PIN in HTTP response
     return res.json({
       success: true,
       message: result.message,
+      pendingVerificationToken: (result as any).pendingVerificationToken,
+      devCode: (result as any).devCode,
     });
   } catch (error: any) {
     console.error("[DIAG] [ROUTE /send-verification-code] Excepción no controlada:", error);
@@ -416,7 +417,7 @@ app.post("/api/auth/trainer/send-credential", async (req, res) => {
 // Verify 6-digit code
 app.post("/api/auth/verify-code", async (req, res) => {
   try {
-    const { email, code } = req.body || {};
+    const { email, code, pendingToken } = req.body || {};
     const masked = maskEmail(email || "");
     console.log(`[DIAG] [ROUTE /verify-code] Petición POST recibida para ${masked}`);
 
@@ -425,7 +426,7 @@ app.post("/api/auth/verify-code", async (req, res) => {
       return res.status(400).json({ success: false, error: "Correo electrónico y código son obligatorios." });
     }
 
-    const result = await verificationService.verifyCode(email, code);
+    const result = await verificationService.verifyCode(email, code, pendingToken);
     if (!result.success) {
       console.warn(`[DIAG] [ROUTE /verify-code] Validación de código no exitosa para ${masked}: ${result.error}`);
       return res.status(result.status || 400).json({

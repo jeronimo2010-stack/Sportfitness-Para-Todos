@@ -246,7 +246,11 @@ export const AthleteRegisterView: React.FC<AthleteRegisterViewProps> = ({
       const res = await authService.sendVerificationCode(email.trim(), 'register_athlete');
       if (res.success) {
         setIsVerifyingEmail(true);
-        setInputCode('');
+        if ((res as any).devCode) {
+          setInputCode((res as any).devCode);
+        } else {
+          setInputCode('');
+        }
         setCodeNotification(
           res.message ||
             (language === 'es'

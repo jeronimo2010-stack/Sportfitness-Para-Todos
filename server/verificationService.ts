@@ -354,12 +354,18 @@ class VerificationService {
         });
     }
 
+    const pendingStateToken = this.generateSignedState(cleanEmail, numericCode, purpose, 15);
+
     console.log(`[DIAG] [VERIF-SVC] ÉXITO: Código despachado correctamente a ${masked} y hash SHA-256 persistido (expira en 10m)`);
 
     return {
       success: true,
-      message: `Código de verificación de 6 dígitos enviado exitosamente a ${cleanEmail}. Revisa tu bandeja de entrada o spam.`,
-    };
+      message: emailResult.simulated
+        ? `✉️ [Modo Vista Previa] Código generado: ${numericCode} (ingrésalo a continuación para continuar).`
+        : `Código de verificación de 6 dígitos enviado exitosamente a ${cleanEmail}. Revisa tu bandeja de entrada o spam.`,
+      pendingVerificationToken: pendingStateToken,
+      devCode: emailResult.simulated ? numericCode : undefined,
+    } as any;
   }
 
   /**

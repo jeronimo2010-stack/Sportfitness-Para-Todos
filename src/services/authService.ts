@@ -507,7 +507,8 @@ class AuthService {
       return {
         success: true,
         message: data.message || `Código enviado exitosamente a ${cleanEmail}. Revisa tu bandeja de entrada o spam.`,
-      };
+        devCode: data?.devCode,
+      } as any;
     } catch (err: any) {
       return {
         success: false,

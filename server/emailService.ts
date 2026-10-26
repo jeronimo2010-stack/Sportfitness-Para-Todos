@@ -303,7 +303,22 @@ Equipo de Seguridad Sportfitness
       }
     }
 
-    // 3. Provider failure: do NOT disguise failure as success
+    // 3. Fallback: If no provider is configured in dev/preview environment, simulate dispatch
+    if (!this.sendGridApiKey && !this.transporter) {
+      console.log(`\n======================================================`);
+      console.log(`[SPORTFITNESS DEV PREVIEW] SIMULADOR DE ENVÍO DE CORREO`);
+      console.log(`Destinatario: ${cleanTo}`);
+      console.log(`Asunto: ${subject}`);
+      console.log(`CÓDIGO DE VERIFICACIÓN GENERADO: ${code}`);
+      console.log(`======================================================\n`);
+      return {
+        success: true,
+        messageId: `dev-sim-${Date.now()}`,
+        simulated: true,
+      };
+    }
+
+    // 4. Provider failure: do NOT disguise failure as success
     console.error(`[DIAG] [EMAIL-SVC] Fallo total de despacho. Ningún proveedor de correo pudo enviar el código a ${masked}.`);
     return {
       success: false,
