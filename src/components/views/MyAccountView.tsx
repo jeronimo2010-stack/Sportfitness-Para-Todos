@@ -347,53 +347,73 @@ export const MyAccountView: React.FC = () => {
 
           {/* Anthropometric Cards Grid */}
           {!isEditingHealth ? (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <div className="bg-zinc-50 dark:bg-zinc-800/60 rounded-xl p-4 border border-zinc-200/60 dark:border-zinc-800">
+            <div className="grid grid-cols-2 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
+              <div className="bg-zinc-50 dark:bg-zinc-800/60 rounded-xl p-4 border border-zinc-200/60 dark:border-zinc-800 min-w-0 flex flex-col justify-between">
                 <div className="flex items-center gap-2 text-zinc-500 mb-1">
-                  <Scale className="w-4 h-4 text-[#56A867]" />
-                  <span className="text-xs font-bold uppercase">{t('weightLabel')}</span>
+                  <Scale className="w-4 h-4 text-[#56A867] shrink-0" />
+                  <span className="text-xs font-bold uppercase tracking-wider">{t('weightLabel')}</span>
                 </div>
-                <div className="flex items-baseline gap-1">
-                  <span className="text-2xl font-black text-zinc-900 dark:text-white">{user.weight || 75}</span>
-                  <span className="text-xs text-zinc-500">kg</span>
+                <div className="mt-0.5">
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-2xl font-black text-zinc-900 dark:text-white">{user.weight || 75}</span>
+                    <span className="text-xs text-zinc-500 font-bold">kg</span>
+                  </div>
+                  <span className="text-[11px] text-zinc-400 dark:text-zinc-500 block mt-0.5">
+                    {language === 'en' ? 'Body weight' : 'Peso corporal'}
+                  </span>
                 </div>
               </div>
 
-              <div className="bg-zinc-50 dark:bg-zinc-800/60 rounded-xl p-4 border border-zinc-200/60 dark:border-zinc-800">
+              <div className="bg-zinc-50 dark:bg-zinc-800/60 rounded-xl p-4 border border-zinc-200/60 dark:border-zinc-800 min-w-0 flex flex-col justify-between">
                 <div className="flex items-center gap-2 text-zinc-500 mb-1">
-                  <Ruler className="w-4 h-4 text-[#56A867]" />
-                  <span className="text-xs font-bold uppercase">{t('heightLabel')}</span>
+                  <Ruler className="w-4 h-4 text-[#56A867] shrink-0" />
+                  <span className="text-xs font-bold uppercase tracking-wider">{t('heightLabel')}</span>
                 </div>
-                <div className="flex items-baseline gap-1">
-                  <span className="text-2xl font-black text-zinc-900 dark:text-white">{user.height || 175}</span>
-                  <span className="text-xs text-zinc-500">cm</span>
+                <div className="mt-0.5">
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-2xl font-black text-zinc-900 dark:text-white">{user.height || 175}</span>
+                    <span className="text-xs text-zinc-500 font-bold">cm</span>
+                  </div>
+                  <span className="text-[11px] text-zinc-400 dark:text-zinc-500 block mt-0.5">
+                    {language === 'en' ? 'Stature' : 'Estatura activa'}
+                  </span>
                 </div>
               </div>
 
-              <div className="bg-zinc-50 dark:bg-zinc-800/60 rounded-xl p-4 border border-zinc-200/60 dark:border-zinc-800">
+              <div className="bg-zinc-50 dark:bg-zinc-800/60 rounded-xl p-4 border border-zinc-200/60 dark:border-zinc-800 min-w-0 flex flex-col justify-between">
                 <div className="flex items-center gap-2 text-zinc-500 mb-1">
-                  <Shirt className="w-4 h-4 text-[#56A867]" />
-                  <span className="text-xs font-bold uppercase">{t('clothingSizeLabel')}</span>
+                  <Shirt className="w-4 h-4 text-[#56A867] shrink-0" />
+                  <span className="text-xs font-bold uppercase tracking-wider">{t('clothingSizeLabel')}</span>
                 </div>
-                <span className="text-2xl font-black text-zinc-900 dark:text-white">
-                  {user.clothingSize || 'M'}
-                </span>
+                <div className="mt-0.5">
+                  <span className="text-2xl font-black text-zinc-900 dark:text-white block">
+                    {user.clothingSize || 'M'}
+                  </span>
+                  <span className="text-[11px] text-zinc-400 dark:text-zinc-500 block mt-0.5">
+                    {language === 'en' ? 'Textile size' : 'Medida textil'}
+                  </span>
+                </div>
               </div>
 
-              <div className="bg-zinc-50 dark:bg-zinc-800/60 rounded-xl p-4 border border-zinc-200/60 dark:border-zinc-800">
+              <div className="bg-zinc-50 dark:bg-zinc-800/60 rounded-xl p-4 border border-[#56A867]/30 dark:border-[#56A867]/40 bg-gradient-to-br from-[#56A867]/5 via-transparent to-transparent min-w-0 flex flex-col justify-between">
                 <div className="flex items-center gap-2 text-zinc-500 mb-1">
-                  <Activity className="w-4 h-4 text-[#56A867]" />
-                  <span className="text-xs font-bold uppercase">{t('bodyTypeLabel')}</span>
+                  <Activity className="w-4 h-4 text-[#56A867] shrink-0" />
+                  <span className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">{t('bodyTypeLabel')}</span>
                 </div>
-                <span className="text-lg font-bold text-zinc-900 dark:text-white truncate block">
-                  {language === 'en'
-                    ? (user.bodyType === 'Mesomorfo' ? 'Mesomorph' : user.bodyType === 'Ectomorfo' ? 'Ectomorph' : 'Endomorph')
-                    : (user.bodyType || 'Mesomorfo')}
-                </span>
+                <div className="mt-0.5">
+                  <span className="text-xl sm:text-2xl font-black text-zinc-900 dark:text-white leading-tight block break-words">
+                    {language === 'en'
+                      ? (user.bodyType === 'Mesomorfo' ? 'Mesomorph' : user.bodyType === 'Ectomorfo' ? 'Ectomorph' : 'Endomorph')
+                      : (user.bodyType || 'Mesomorfo')}
+                  </span>
+                  <span className="text-[11px] text-[#448652] dark:text-[#56A867] font-semibold block mt-0.5">
+                    {language === 'en' ? 'Biomechanical structure' : 'Estructura biomecánica'}
+                  </span>
+                </div>
               </div>
 
               {/* Live BMI display */}
-              <div className="col-span-2 sm:col-span-4 bg-gradient-to-r from-lime-500/10 via-transparent to-transparent rounded-xl p-4 border border-[#56A867]/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="col-span-2 xl:col-span-4 bg-gradient-to-r from-lime-500/10 via-transparent to-transparent rounded-xl p-4 border border-[#56A867]/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
                   <span className="text-xs font-bold text-[#448652] dark:text-[#56A867] uppercase tracking-wider block">
                     {t('bmiLabel')}
@@ -417,7 +437,7 @@ export const MyAccountView: React.FC = () => {
           ) : (
             /* Editing form */
             <form onSubmit={handleSaveHealthProfile} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
                 <div>
                   <label className="text-xs font-bold text-zinc-500 uppercase block mb-1">
                     {t('weightLabel')} (kg)

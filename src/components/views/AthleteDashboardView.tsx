@@ -530,63 +530,68 @@ export const AthleteDashboardView: React.FC<AthleteDashboardViewProps> = ({
         </div>
 
         {/* Biometrics Display Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-          <div className="p-3 rounded-xl bg-[#171722] border border-[#222230]">
+        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-3">
+          <div className="p-3 rounded-xl bg-[#171722] border border-[#222230] min-w-0 flex flex-col justify-between">
             <span className="text-[10px] font-mono text-[#7E7E8E] uppercase flex items-center gap-1">
-              <Weight className="w-3 h-3 text-[#56A867]" /> {t('weight')}
+              <Weight className="w-3 h-3 text-[#56A867] shrink-0" /> {t('weight')}
             </span>
             <div className="text-xl font-bold font-mono text-white mt-1">
               {user.weight || 75} <span className="text-xs font-normal text-[#8E8E9E]">kg</span>
             </div>
-            <span className="text-[10px] text-[#56A867] font-mono">
+            <span className="text-[10px] text-[#56A867] font-mono mt-0.5">
               {language === 'en' ? 'Active Weigh-in' : 'Pesaje Activo'}
             </span>
           </div>
 
-          <div className="p-3 rounded-xl bg-[#171722] border border-[#222230]">
+          <div className="p-3 rounded-xl bg-[#171722] border border-[#222230] min-w-0 flex flex-col justify-between">
             <span className="text-[10px] font-mono text-[#7E7E8E] uppercase flex items-center gap-1">
-              <Ruler className="w-3 h-3 text-[#56A867]" /> {t('height')}
+              <Ruler className="w-3 h-3 text-[#56A867] shrink-0" /> {t('height')}
             </span>
             <div className="text-xl font-bold font-mono text-white mt-1">
               {user.height || 175} <span className="text-xs font-normal text-[#8E8E9E]">cm</span>
             </div>
-            <span className="text-[10px] text-[#8E8E9E] font-mono">
+            <span className="text-[10px] text-[#8E8E9E] font-mono mt-0.5">
               {language === 'en' ? 'Stature' : 'Estatura'}
             </span>
           </div>
 
-          <div className="p-3 rounded-xl bg-[#171722] border border-[#222230]">
+          <div className="p-3 rounded-xl bg-[#171722] border border-[#222230] min-w-0 flex flex-col justify-between">
             <span className="text-[10px] font-mono text-[#7E7E8E] uppercase flex items-center gap-1">
-              <Activity className="w-3 h-3 text-[#56A867]" /> {t('clothingSize')}
+              <Activity className="w-3 h-3 text-[#56A867] shrink-0" /> {t('clothingSize')}
             </span>
             <div className="text-xl font-bold font-mono text-[#56A867] mt-1">
               {user.clothingSize || 'M'}
             </div>
-            <span className="text-[10px] text-[#8E8E9E] font-mono">
+            <span className="text-[10px] text-[#8E8E9E] font-mono mt-0.5">
               {language === 'en' ? 'Textile size' : 'Medida textil'}
             </span>
           </div>
 
-          <div className="p-3 rounded-xl bg-[#171722] border border-[#222230]">
+          <div className="p-3 rounded-xl bg-[#171722] border border-[#222230] min-w-0 flex flex-col justify-between">
             <span className="text-[10px] font-mono text-[#7E7E8E] uppercase flex items-center gap-1">
-              <TrendingUp className="w-3 h-3 text-[#56A867]" /> {t('bmi')}
+              <TrendingUp className="w-3 h-3 text-[#56A867] shrink-0" /> {t('bmi')}
             </span>
             <div className="text-xl font-bold font-mono text-white mt-1">
               {bmiInfo.bmi}
             </div>
-            <span className="text-[10px] text-emerald-400 font-mono truncate">
+            <span className="text-[10px] text-emerald-400 font-mono truncate mt-0.5">
               {language === 'en' ? (bmiInfo.category === 'Peso normal / Óptimo' ? 'Normal / Optimal weight' : bmiInfo.category) : bmiInfo.category}
             </span>
           </div>
 
-          <div className="p-3 rounded-xl bg-[#171722] border border-[#222230] col-span-2 sm:col-span-1">
-            <span className="text-[10px] font-mono text-[#7E7E8E] uppercase flex items-center gap-1">
-              <Sparkles className="w-3 h-3 text-[#56A867]" /> {t('bodyType')}
-            </span>
-            <div className="text-sm font-bold font-mono text-white mt-1 truncate">
+          <div className="p-3 rounded-xl bg-[#171722] border border-[#56A867]/30 bg-gradient-to-br from-[#56A867]/10 via-[#171722] to-[#171722] col-span-2 sm:col-span-2 xl:col-span-1 min-w-0 flex flex-col justify-between">
+            <div className="flex items-center justify-between gap-1 text-[10px] font-mono text-[#7E7E8E] uppercase">
+              <span className="flex items-center gap-1 text-[#8E8E9E]">
+                <Sparkles className="w-3 h-3 text-[#56A867] shrink-0" /> {t('bodyType')}
+              </span>
+              <span className="text-[9px] px-1.5 py-0.5 text-[#56A867] bg-[#56A867]/15 rounded border border-[#56A867]/25 font-mono font-semibold">
+                {language === 'en' ? 'Biotype' : 'Biotipo'}
+              </span>
+            </div>
+            <div className="text-base sm:text-lg font-bold text-white mt-1 leading-snug break-words">
               {language === 'en' ? (user.bodyType === 'Mesomorfo' ? 'Mesomorph' : user.bodyType === 'Ectomorfo' ? 'Ectomorph' : 'Endomorph') : (user.bodyType || 'Mesomorfo')}
             </div>
-            <span className="text-[10px] text-[#8E8E9E] font-mono">
+            <span className="text-[10px] text-[#56A867] font-mono mt-0.5 block">
               {language === 'en' ? 'Bone structure' : 'Estructura ósea'}
             </span>
           </div>
@@ -714,257 +719,47 @@ export const AthleteDashboardView: React.FC<AthleteDashboardViewProps> = ({
         </div>
       )}
 
-      {/* Starter Exercise Banner (Prerregistro Biométrico) */}
-      <ScrollReveal direction="up" delay={0.1} duration={0.5}>
-        <div className="p-5 rounded-2xl bg-gradient-to-br from-[#151520] via-[#101018] to-[#0A0A0F] border border-[#56A867]/30 shadow-[0_0_25px_rgba(86,168,103,0.08)] relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-72 h-72 bg-[#56A867]/10 rounded-full blur-3xl pointer-events-none" />
-
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-[#22222E] relative z-10">
+      {/* Sleek Quick Access Banner to Entrenamientos & Live Session */}
+      <ScrollReveal direction="up" delay={0.1} duration={0.4}>
+        <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-[#14141E] via-[#101018] to-[#14141E] border border-[#56A867]/25 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[#56A867]/15 border border-[#56A867]/30 flex items-center justify-center text-[#56A867] shrink-0">
+              <Dumbbell className="w-5 h-5" />
+            </div>
             <div>
-              <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-[#56A867]/15 text-[#56A867] text-[10px] font-mono font-bold uppercase tracking-wider mb-1">
-                <Sparkles className="w-3 h-3" />
-                <span>{language === 'en' ? 'Biometric Profile • Starter Exercise' : 'Registro Biométrico • Ejercicio de Inicio'}</span>
-              </div>
-              <h2 className="text-xl sm:text-2xl font-serif font-bold text-white flex items-center gap-2">
-                <span>{starterExercise.exerciseName}</span>
-                <span className="text-xs font-mono font-normal text-[#56A867] bg-[#1B1B26] px-2 py-0.5 rounded-md border border-[#2B2B3A]">
-                  {starterExercise.category}
-                </span>
-              </h2>
-              <p className="text-xs text-[#9E9EA8] mt-1 max-w-2xl">
-                {language === 'en'
-                  ? `Calibrated for your somatotype ${user.bodyType === 'Mesomorfo' ? 'Mesomorph' : user.bodyType === 'Ectomorfo' ? 'Ectomorph' : (user.bodyType || 'Mesomorph')} (${user.height || 175} cm, ${user.weight || 75} kg, Size ${user.clothingSize || 'M'}). Target stimulus: progressive overload and technical mastery.`
-                  : `Calibrado para tu somatotipo ${user.bodyType || 'Mesomorfo'} (${user.height || 175} cm, ${user.weight || 75} kg, Talla ${user.clothingSize || 'M'}). ${starterExercise.whyThisExercise}`}
-              </p>
-            </div>
-
-            <div className="flex items-center gap-2 shrink-0">
-              <button
-                onClick={() => onNavigate('live-workout')}
-                className="py-2.5 px-4 rounded-xl bg-[#56A867] hover:bg-[#64B875] text-black text-xs font-bold font-mono uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-[0_0_15px_rgba(86,168,103,0.25)]"
-              >
-                <Dumbbell className="w-3.5 h-3.5" />
-                <span>{language === 'en' ? 'Train This Exercise' : 'Entrenar Este Ejercicio'}</span>
-              </button>
-              <button
-                onClick={() => setIsEditingHealth(true)}
-                className="py-2.5 px-3 rounded-xl bg-[#181822] hover:bg-[#20202E] border border-[#2A2A38] text-neutral-300 text-xs font-mono transition-colors"
-                title={language === 'en' ? 'Recalibrate biometrics' : 'Actualizar datos biométricos'}
-              >
-                {language === 'en' ? 'Recalibrate' : 'Recalibrar'}
-              </button>
-            </div>
-          </div>
-
-          {/* Prescription chips */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-3 text-xs font-mono relative z-10">
-            <div className="bg-[#12121A] p-2.5 rounded-xl border border-[#1E1E28] flex items-center justify-between">
-              <span className="text-[#7E7E8E] text-[10px] uppercase">
-                {language === 'en' ? 'Sets × Reps' : 'Series × Reps'}
-              </span>
-              <span className="text-[#56A867] font-bold">{starterExercise.sets} × {starterExercise.reps}</span>
-            </div>
-            <div className="bg-[#12121A] p-2.5 rounded-xl border border-[#1E1E28] flex items-center justify-between">
-              <span className="text-[#7E7E8E] text-[10px] uppercase">
-                {language === 'en' ? 'Initial Load' : 'Carga Inicial'}
-              </span>
-              <span className="text-white font-bold">{starterExercise.suggestedWeightKg} kg</span>
-            </div>
-            <div className="bg-[#12121A] p-2.5 rounded-xl border border-[#1E1E28] flex items-center justify-between">
-              <span className="text-[#7E7E8E] text-[10px] uppercase">
-                {language === 'en' ? 'Target RPE' : 'Objetivo RPE'}
-              </span>
-              <span className="text-white font-bold">{starterExercise.rpeTarget}</span>
-            </div>
-            <div className="bg-[#12121A] p-2.5 rounded-xl border border-[#1E1E28] flex items-center justify-between">
-              <span className="text-[#7E7E8E] text-[10px] uppercase">
-                {language === 'en' ? 'Target Muscle' : 'Músculo Principal'}
-              </span>
-              <span className="text-white font-bold truncate">{starterExercise.targetMuscle}</span>
-            </div>
-          </div>
-        </div>
-      </ScrollReveal>
-
-      {/* Main Grid: Upcoming Workout Session + Coach Quote */}
-      <ScrollReveal direction="up" delay={0.1} duration={0.5}>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left 2 Cols: Upcoming Scheduled Workout Card */}
-          <div className="lg:col-span-2 p-6 rounded-2xl bg-gradient-to-br from-[#16161F] to-[#111116] border border-[#272733] relative overflow-hidden flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between gap-2 mb-3">
-                <div className="flex items-center gap-2">
-                  <span className="px-2.5 py-1 rounded-full bg-[#56A867] text-black font-bold text-[10px] font-mono uppercase">
-                    {!hasCompletedAnySession
-                      ? (language === 'en' ? 'First Session' : 'Primera Sesión')
-                      : isInactiveOver15Days
-                      ? (language === 'en' ? 'Reactivation' : 'Readaptación')
-                      : (language === 'en' ? 'Next Session' : 'Próxima Sesión')}
-                  </span>
-                  <span className="text-xs text-[#808090] font-mono flex items-center gap-1">
-                    <Clock className="w-3.5 h-3.5 text-[#56A867]" />{' '}
-                    {isZeroState
-                      ? (language === 'en' ? 'Ready to Start' : 'Lista para iniciar')
-                      : (language === 'en' ? 'In 2 hours (18:00)' : 'En 2 horas (18:00)')}
-                  </span>
-                </div>
-                <span className="text-xs font-mono text-[#56A867] font-semibold">
-                  {language === 'en' ? 'Target:' : 'Objetivo:'}{' '}
-                  {isZeroState ? '0 kg (Calibración)' : `${bioProfile.targetSessionVolumeKg.toLocaleString()} kg`}
-                </span>
-              </div>
-
-              <h2 className="text-2xl sm:text-3xl font-serif font-bold text-white mb-2">
-                {!hasCompletedAnySession
-                  ? (language === 'en' ? 'Session 1: Biomechanical Calibration' : 'Sesión 1: Calibración Biomecánica')
-                  : isInactiveOver15Days
-                  ? (language === 'en' ? 'Reactivation Block: Joint & Neural Adaptation' : 'Bloque de Readaptación: Articular & Neuromuscular')
-                  : 'Leg Day: Hypertrophy & Force Isolation'}
-              </h2>
-              <p className="text-xs sm:text-sm text-[#A0A0B0] leading-relaxed max-w-xl">
-                {!hasCompletedAnySession
-                  ? (language === 'en'
-                      ? 'Welcome to your training plan. Your account starts with zero metrics. Complete this initial routine to calibrate your effective loads and establish baseline biomechanical technique.'
-                      : 'Bienvenido a tu plan de entrenamiento. Tu cuenta inicia limpia en ceros. Completa esta rutina inicial para calibrar tus cargas efectivas y registrar tu técnica biomecánica base.')
-                  : isInactiveOver15Days
-                  ? (language === 'en'
-                      ? 'You have been inactive for over 15 days. Active load and streak have been set to zero to avoid overtraining and injury. Start with light compound movements.'
-                      : 'Llevas más de 15 días sin entrenar. La carga acumulada y la racha se han reiniciado a cero para prevenir lesiones y sobrecargas. Inicia con movimientos de adaptación articular.')
-                  : (language === 'en'
-                      ? 'Focus on 3-second eccentric control on Back Squats and Leg Press. Loads tailored to your registered biometrics.'
-                      : 'Foco en control excéntrico de 3 segundos en Sentadilla Trasera y Prensa de Piernas. Cargas ajustadas a tus biométricos de registro.')}
-              </p>
-
-              {/* Exercise preview pills */}
-              <div className="mt-4 flex flex-wrap gap-2">
-                {!hasCompletedAnySession ? (
-                  <>
-                    <span className="px-3 py-1 rounded-lg bg-[#1D1D27] text-white text-xs font-mono border border-[#2B2B38] flex items-center gap-1.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#56A867]" />
-                      {language === 'en' ? 'Mobility & Joint Warmup' : 'Movilidad & Calentamiento'} (5 min)
-                    </span>
-                    <span className="px-3 py-1 rounded-lg bg-[#1D1D27] text-white text-xs font-mono border border-[#2B2B38] flex items-center gap-1.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#56A867]" />
-                      {language === 'en' ? 'Postural Technique Test' : 'Test de Técnica Postural'} (3 series)
-                    </span>
-                    <span className="px-3 py-1 rounded-lg bg-[#1D1D27] text-white text-xs font-mono border border-[#2B2B38] flex items-center gap-1.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#56A867]" />
-                      {starterExercise.exerciseName} ({starterExercise.sets} × {starterExercise.reps} @ {starterExercise.suggestedWeightKg} kg)
-                    </span>
-                  </>
-                ) : isInactiveOver15Days ? (
-                  <>
-                    <span className="px-3 py-1 rounded-lg bg-[#1D1D27] text-white text-xs font-mono border border-[#2B2B38] flex items-center gap-1.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                      {language === 'en' ? '3s Eccentric Tempo' : 'Cadencia Excéntrica 3s'}
-                    </span>
-                    <span className="px-3 py-1 rounded-lg bg-[#1D1D27] text-white text-xs font-mono border border-[#2B2B38] flex items-center gap-1.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#56A867]" />
-                      {language === 'en' ? 'Moderate Load Reactivation' : 'Carga Moderada de Adaptación'}
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <span className="px-3 py-1 rounded-lg bg-[#1D1D27] text-white text-xs font-mono border border-[#2B2B38] flex items-center gap-1.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#56A867]" />
-                      {language === 'en' ? 'Back Squat' : 'Sentadilla Trasera'} (4 × 6-8 @ {squatLoad} kg)
-                    </span>
-                    <span className="px-3 py-1 rounded-lg bg-[#1D1D27] text-white text-xs font-mono border border-[#2B2B38] flex items-center gap-1.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#56A867]" />
-                      {language === 'en' ? '45° Leg Press' : 'Prensa 45°'} (3 × 10 @ {legPressLoad} kg)
-                    </span>
-                    <span className="px-3 py-1 rounded-lg bg-[#1D1D27] text-white text-xs font-mono border border-[#2B2B38] flex items-center gap-1.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#56A867]" />
-                      {language === 'en' ? 'Romanian Deadlift' : 'Peso Muerto Rumano'} (3 × 12 @ {rdlLoad} kg)
-                    </span>
-                  </>
-                )}
-              </div>
-
-              <div className="mt-2.5 inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-[#161622] border border-[#222232] text-[11px] font-mono text-[#8E8E9E]">
-                <span className="text-[#56A867] font-bold">{language === 'en' ? 'Active Biometrics:' : 'Biometría Activa:'}</span>
-                <span>{language === 'en' ? 'Weight:' : 'Peso:'} <strong className="text-white">{user.weight || 75} kg</strong></span>
-                <span>•</span>
-                <span>{language === 'en' ? 'Height:' : 'Altura:'} <strong className="text-white">{user.height || 175} cm</strong></span>
-                <span>•</span>
-                <span>{language === 'en' ? 'Size:' : 'Talla:'} <strong className="text-[#56A867]">{user.clothingSize || 'M'}</strong></span>
-                <span>•</span>
-                <span>{language === 'en' ? 'Somatotype:' : 'Somatotipo:'} <strong className="text-white">{language === 'en' ? (user.bodyType === 'Mesomorfo' ? 'Mesomorph' : user.bodyType === 'Ectomorfo' ? 'Ectomorph' : 'Endomorph') : (user.bodyType || 'Mesomorfo')}</strong></span>
-              </div>
-            </div>
-
-            <div className="mt-6 pt-4 border-t border-[#22222E] flex flex-wrap items-center gap-3">
-              <button
-                onClick={() => onNavigate('live-workout')}
-                className="py-3 px-6 rounded-xl bg-[#56A867] hover:bg-[#64B875] text-black font-bold text-xs transition-all shadow-[0_0_20px_rgba(86,168,103,0.3)] hover:shadow-[0_0_30px_rgba(86,168,103,0.5)] flex items-center gap-2 uppercase tracking-wider cursor-pointer"
-              >
-                <Zap className="w-4 h-4 fill-black" />
-                <span>
-                  {!hasCompletedAnySession
-                    ? (language === 'en' ? 'START FIRST SESSION' : 'INICIAR PRIMERA SESIÓN')
-                    : isInactiveOver15Days
-                    ? (language === 'en' ? 'RESUME WORKOUT' : 'REANUDAR ENTRENAMIENTO')
-                    : (language === 'en' ? 'START SESSION' : 'INICIAR SESIÓN')}
-                </span>
-              </button>
-
-              <button
-                onClick={() => onNavigate('routines')}
-                className="py-3 px-5 rounded-xl bg-[#1A1A24] hover:bg-[#232330] text-white font-medium text-xs border border-[#2A2A38] transition-all cursor-pointer"
-              >
-                {language === 'en' ? 'View Routine Details' : 'Ver Detalles del Bloque'}
-              </button>
-            </div>
-          </div>
-
-          {/* Right 1 Col: Coach Quote & Feedback Note */}
-          <div className="space-y-4">
-            {/* Quote Card */}
-            <div className="p-5 rounded-2xl bg-[#14141C] border border-[#242432] relative">
-              <Quote className="w-8 h-8 text-[#56A867]/20 absolute top-4 right-4" />
-              <span className="text-[10px] font-mono uppercase tracking-wider text-[#56A867] font-semibold">
-                {language === 'en' ? "Coach's Principle" : 'Máxima del Entrenador'}
-              </span>
-              <p className="mt-2 text-sm text-[#E0E0E0] font-serif italic leading-relaxed">
-                "Precision is the difference between sweat and progress."
-              </p>
-              <span className="text-xs text-[#808090] font-mono block mt-2">— Coach V.</span>
-            </div>
-
-            {/* Coach Specific Feedback */}
-            <div className="p-5 rounded-2xl bg-[#14141C] border border-[#242432] space-y-2">
               <div className="flex items-center gap-2">
-                <span className={`w-2 h-2 rounded-full ${isZeroState ? 'bg-amber-400' : 'bg-[#56A867]'}`} />
-                <span className="text-xs font-bold text-white">
-                  {language === 'en' ? "Coach's Note (Carlos V.)" : 'Nota de tu Coach (Carlos V.)'}
-                </span>
-              </div>
-              <p className="text-xs text-[#A0A0B0] leading-relaxed">
-                {!hasCompletedAnySession
-                  ? (language === 'en'
-                      ? `Welcome to Sportfitness, ${user.name.split(' ')[0]}! All your metrics are initialized at zero. Once you finish your first live session, I will evaluate your biomechanical technique and record your initial training loads in the database.`
-                      : `¡Bienvenido a Sportfitness, ${user.name.split(' ')[0]}! Todas tus métricas están en ceros. En cuanto termines tu primera sesión en vivo, evaluaré tu precisión biomecánica y registraré tus primeras marcas en la base de datos.`)
-                  : isInactiveOver15Days
-                  ? (language === 'en'
-                      ? `Hello ${user.name.split(' ')[0]}, you have been inactive for more than 15 days. For physiological safety, your accumulated tonnage and streak have returned to zero. Start back with adaptation sets.`
-                      : `Hola ${user.name.split(' ')[0]}, detectamos más de 15 días sin actividad registrada. Por seguridad neuromuscular y tendinosa, tu carga acumulada y racha han vuelto a ceros. Reanuda con series de adaptación.`)
-                  : (language === 'en'
-                      ? `"Excellent technical execution on your last block, ${user.name.split(' ')[0]}. Keep focus on intra-abdominal pressure before every heavy set."`
-                      : `"Excelente ejecución técnica en tu último bloque, ${user.name.split(' ')[0]}. Mantén el foco en la respiración intra-abdominal antes de cada serie pesada."`)}
-              </p>
-              <div className="pt-2 flex justify-between items-center text-[11px]">
-                <span className="text-[#6E6E7E] font-mono">
-                  {language === 'en' ? 'Verified by Head Coach' : 'Verificado por Head Coach'}
-                </span>
-                <span className={`font-mono font-semibold ${isZeroState ? 'text-amber-400' : 'text-[#56A867]'}`}>
+                <span className="text-white font-bold text-sm sm:text-base">
                   {!hasCompletedAnySession
-                    ? (language === 'en' ? 'Awaiting 1st Session' : 'Esperando 1ra Sesión')
-                    : isInactiveOver15Days
-                    ? (language === 'en' ? 'Reactivation Required' : 'Inactividad > 15 Días')
-                    : (language === 'en' ? 'Active' : 'Activo')}
+                    ? (language === 'en' ? 'Session 1: Biomechanical Calibration Ready' : 'Sesión 1: Calibración Biomecánica Lista')
+                    : (language === 'en' ? 'Calibrated Workouts & Starter Exercise' : 'Entrenamientos & Ejercicio de Inicio')}
+                </span>
+                <span className="px-2 py-0.5 rounded-full bg-[#56A867]/20 text-[#56A867] text-[10px] font-mono font-bold">
+                  {user.bodyType || 'Mesomorfo'}
                 </span>
               </div>
+              <p className="text-xs text-[#8E8E9E] mt-0.5">
+                {language === 'en'
+                  ? 'Your personalized starter routine, scheduled sessions, and coach notes are organized in Workouts.'
+                  : 'Tu rutina inicial calibrada, sesiones programadas y notas del coach se encuentran en la sección de Entrenamientos.'}
+              </p>
             </div>
+          </div>
+
+          <div className="flex items-center gap-2.5 shrink-0">
+            <button
+              onClick={() => onNavigate('routines')}
+              className="py-2.5 px-4 rounded-xl bg-[#56A867] hover:bg-[#64B875] text-black text-xs font-bold font-mono uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-[0_0_15px_rgba(86,168,103,0.25)] cursor-pointer"
+            >
+              <Dumbbell className="w-3.5 h-3.5" />
+              <span>{language === 'en' ? 'Go to Workouts' : 'Ver en Entrenamientos'}</span>
+            </button>
+            <button
+              onClick={() => onNavigate('live-workout')}
+              className="py-2.5 px-4 rounded-xl bg-[#1C1C28] hover:bg-[#252535] border border-[#2B2B3A] text-white text-xs font-mono flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <Zap className="w-3.5 h-3.5 text-[#56A867]" />
+              <span>{language === 'en' ? 'Start Live Session' : 'Iniciar Sesión'}</span>
+            </button>
           </div>
         </div>
       </ScrollReveal>
