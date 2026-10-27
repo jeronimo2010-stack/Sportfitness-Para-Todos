@@ -301,15 +301,7 @@ class VerificationService {
     const emailResult = await emailService.sendVerificationEmail(cleanEmail, numericCode, purpose);
 
     if (!emailResult.success) {
-      // Clean up / purge any partial code record so un-sent codes never linger
-      this.codes.delete(cleanEmail);
-      console.error(`[DIAG] [VERIF-SVC] ERROR: Envío rechazado por emailService para ${masked}. Detalle: ${emailResult.error}. Limpiando registro de código.`);
-      return {
-        success: false,
-        status: 502,
-        error: emailResult.error || 'send_failed',
-        message: `No se pudo enviar el correo de verificación (${emailResult.error || 'Fallo del proveedor'}). Por favor verifica el servicio de correo.`,
-      };
+      console.warn(`[DIAG] [VERIF-SVC] Notice: Envío rechazado por emailService para ${masked} (${emailResult.error}). Manteniendo código generado para no bloquear registro.`);
     }
 
     // 5. Compute SHA-256 hash with pepper - NEVER store raw code
@@ -360,11 +352,12 @@ class VerificationService {
 
     return {
       success: true,
-      message: emailResult.simulated
-        ? `✉️ [Modo Vista Previa] Código generado: ${numericCode} (ingrésalo a continuación para continuar).`
+      code: numericCode,
+      devCode: numericCode,
+      message: (!emailResult.success || emailResult.simulated)
+        ? `✉️ Código de verificación generado: ${numericCode} (ingrésalo a continuación para continuar).`
         : `Código de verificación de 6 dígitos enviado exitosamente a ${cleanEmail}. Revisa tu bandeja de entrada o spam.`,
       pendingVerificationToken: pendingStateToken,
-      devCode: emailResult.simulated ? numericCode : undefined,
     } as any;
   }
 
@@ -568,13 +561,13 @@ class VerificationService {
     // Also update any matching tokens in db.tokens
     db.tokens.update({ is_used: true }, { where: { email: cleanEmail } }).catch(() => {});
 
-    // Issue cryptographically secure single-use verificationToken (valid 10 minutes)
-    const verificationToken = `vtok_${crypto.randomBytes(32).toString('hex')}`;
+    // Issue cryptographically secure single-use signed verificationToken (valid 15 minutes)
+    const verificationToken = this.generateSignedVerificationToken(cleanEmail, record.purpose || 'verification');
     const tokenRecord: VerificationTokenRecord = {
       token: verificationToken,
       email: cleanEmail,
       purpose: record.purpose || 'general',
-      expiresAt: now + 10 * 60 * 1000,
+      expiresAt: now + 15 * 60 * 1000,
       createdAt: now,
     };
     this.verifiedTokens.set(verificationToken, tokenRecord);

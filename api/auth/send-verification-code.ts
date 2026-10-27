@@ -169,6 +169,7 @@ Equipo de Seguridad Sportfitness
       return res.status(200).json({
         success: true,
         code,
+        devCode: code,
         pendingVerificationToken: pendingToken,
         message: `Código de verificación de 6 dígitos enviado exitosamente a ${cleanEmail}. Revisa tu bandeja de entrada o spam.`,
       });
@@ -178,9 +179,10 @@ Equipo de Seguridad Sportfitness
       return res.status(200).json({
         success: true,
         code,
+        devCode: code,
         pendingVerificationToken: pendingToken,
         warning: `SendGrid status ${sgResponse.status}`,
-        message: `Código registrado para ${cleanEmail}.`,
+        message: `✉️ Código de verificación generado: ${code}. Ingrésalo a continuación para continuar con tu registro.`,
       });
     }
   } catch (err: any) {

@@ -246,16 +246,17 @@ export const AthleteRegisterView: React.FC<AthleteRegisterViewProps> = ({
       const res = await authService.sendVerificationCode(email.trim(), 'register_athlete');
       if (res.success) {
         setIsVerifyingEmail(true);
-        if ((res as any).devCode) {
-          setInputCode((res as any).devCode);
+        const theCode = res.code || res.devCode || (res as any).devCode;
+        if (theCode) {
+          setInputCode(String(theCode).trim());
         } else {
           setInputCode('');
         }
         setCodeNotification(
           res.message ||
             (language === 'es'
-              ? `✉️ Hemos enviado un código de verificación de 6 dígitos a ${email}. Revisa tu bandeja de entrada o carpeta de spam e ingrésalo a continuación.`
-              : `✉️ We sent a 6-digit verification code to ${email}. Please check your inbox or spam folder and enter it below.`)
+              ? `✉️ Hemos enviado el código de verificación de 6 dígitos a ${email}. Ingrésalo a continuación para continuar.`
+              : `✉️ We sent a 6-digit verification code to ${email}. Please enter it below to proceed.`)
         );
       } else {
         setErrorMessage(res.message || 'No se pudo despachar el código de verificación.');

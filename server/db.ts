@@ -1589,12 +1589,20 @@ export async function verificarCodigo(
           process.env.SESSION_SECRET ||
           'sf_secure_pepper_2026_sportfitness_auth_hash'
         ).trim();
-        const expectedPayload = `${cleanEmail}:${cleanCode}:${stateObj.exp}:${stateObj.p || 'registro'}`;
-        const expectedSig = crypto.createHmac('sha256', pepper).update(expectedPayload).digest('hex');
-        const sigBuf = Buffer.from(stateObj.sig);
-        const expBuf = Buffer.from(expectedSig);
-        if (sigBuf.length === expBuf.length && crypto.timingSafeEqual(sigBuf, expBuf)) {
-          return { success: true, message: "Código verificado correctamente." };
+
+        // Check against stateObj purpose as well as common registration purposes
+        const possiblePurposes = Array.from(
+          new Set([stateObj.p, 'registro', 'register_trainer', 'register_athlete', 'general', 'verification'].filter(Boolean))
+        );
+
+        for (const purp of possiblePurposes) {
+          const expectedPayload = `${cleanEmail}:${cleanCode}:${stateObj.exp}:${purp}`;
+          const expectedSig = crypto.createHmac('sha256', pepper).update(expectedPayload).digest('hex');
+          const sigBuf = Buffer.from(stateObj.sig);
+          const expBuf = Buffer.from(expectedSig);
+          if (sigBuf.length === expBuf.length && crypto.timingSafeEqual(sigBuf, expBuf)) {
+            return { success: true, message: "Código verificado correctamente." };
+          }
         }
       }
     } catch (e: any) {

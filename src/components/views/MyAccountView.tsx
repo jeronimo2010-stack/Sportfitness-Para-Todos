@@ -178,12 +178,18 @@ export const MyAccountView: React.FC = () => {
     }
   };
 
-  // Computed metrics (Strictly actual user progress - never use fake/hardcoded fallbacks)
-  const streakCount = progressData?.streakDays ?? user.streakDays ?? 0;
-  const activeDays = progressData?.activeDaysTotal ?? user.activeDaysTotal ?? 0;
-  const totalSessions = progressData?.sessionsCompleted ?? user.sessionsThisWeek ?? 0;
-  const totalVolume = progressData?.totalVolumeKg ?? 0;
+  // Computed metrics (Strictly actual user progress - never invent figures, 0 until real volume is moved)
   const workoutLogs = Array.isArray(progressData?.workoutLogs) ? progressData.workoutLogs : [];
+  const hasRealWorkouts = workoutLogs.length > 0 || (Number(progressData?.sessionsCompleted) > 0 && Number(progressData?.totalVolumeKg) > 0);
+
+  const totalSessions = hasRealWorkouts ? (progressData?.sessionsCompleted ?? 0) : 0;
+  const totalVolume = hasRealWorkouts
+    ? (workoutLogs.length > 0
+        ? workoutLogs.reduce((sum: number, log: any) => sum + (Number(log.tonnageRecordedKg) || 0), 0) || (progressData?.totalVolumeKg ?? 0)
+        : (progressData?.totalVolumeKg ?? 0))
+    : 0;
+  const streakCount = hasRealWorkouts ? (progressData?.streakDays ?? 0) : 0;
+  const activeDays = hasRealWorkouts ? (progressData?.activeDaysTotal ?? 0) : 0;
 
   return (
     <div className="w-full max-w-7xl mx-auto px-4 py-8 space-y-8" id="my-account-module">
@@ -641,7 +647,7 @@ export const MyAccountView: React.FC = () => {
             </div>
             <div className="flex items-baseline gap-2">
               <span className="text-4xl font-black text-zinc-900 dark:text-white font-mono">
-                {(totalVolume / 1000).toFixed(1)}
+                {totalVolume > 0 ? (totalVolume / 1000).toFixed(1) : '0'}
               </span>
               <span className="text-sm font-bold text-purple-400">
                 {language === 'en' ? 'tonnes moved' : 'toneladas movidas'}
