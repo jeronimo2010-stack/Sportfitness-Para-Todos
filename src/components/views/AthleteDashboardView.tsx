@@ -29,6 +29,8 @@ import {
   ShieldCheck,
   Check,
   AlertTriangle,
+  MessageSquare,
+  UserCheck,
 } from 'lucide-react';
 import { ScreenId, UserProfile, ClothingSize, BodyType, UserProgressRecord } from '../../types';
 import { generateStarterExercise, calculateBmi } from '../../utils/starterExerciseGenerator';
@@ -39,6 +41,8 @@ import { localDatabase } from '../../db/localDatabase';
 import { ScrollReveal, StaggerContainer, StaggerItem } from '../common/ScrollReveal';
 import { AthleteNotesWidget } from '../dashboard/AthleteNotesWidget';
 import { PersonalRecordsFolderManager } from '../dashboard/PersonalRecordsFolderManager';
+import { AthleteAnalyticsCharts } from '../dashboard/AthleteAnalyticsCharts';
+import { CoachAthleteChatModal } from '../chat/CoachAthleteChatModal';
 
 interface AthleteDashboardViewProps {
   onNavigate: (screen: ScreenId) => void;
@@ -69,6 +73,31 @@ export const AthleteDashboardView: React.FC<AthleteDashboardViewProps> = ({
   const [editClothingSize, setEditClothingSize] = useState<ClothingSize>(user.clothingSize || 'M');
   const [editBodyType, setEditBodyType] = useState<BodyType>(user.bodyType || 'Mesomorfo');
   const [saveSuccess, setSaveSuccess] = useState(false);
+
+  // Coach communication chat state
+  const [isCoachChatOpen, setIsCoachChatOpen] = useState(false);
+  const assignedCoach: UserProfile = useMemo(() => {
+    const allUsers = localDatabase.getUsers();
+    if (user.trainerId) {
+      const found = allUsers.find((u) => u.id === user.trainerId);
+      if (found) return found;
+    }
+    const coachUser = allUsers.find((u) => u.role === 'entrenador');
+    if (coachUser) return coachUser;
+    return {
+      id: user.trainerId || 'trainer_coach_default',
+      name: user.trainerName || 'Coach Roberto Méndez',
+      email: 'coach.roberto@sportfitness.pro',
+      role: 'entrenador',
+      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+      membershipPlan: 'Elite Access',
+      weeklyVolumePercent: 100,
+      streakDays: 45,
+      streakDiscountPercent: 45,
+      weight: 82,
+      height: 182,
+    };
+  }, [user.trainerId, user.trainerName]);
 
   // Load progress history from database on component mount or user change
   useEffect(() => {
@@ -865,93 +894,62 @@ export const AthleteDashboardView: React.FC<AthleteDashboardViewProps> = ({
         <AthleteNotesWidget userId={user.id} />
       </ScrollReveal>
 
-      {/* Activity Chart: Volume vs Technique */}
-      <ScrollReveal direction="up" delay={0.12} duration={0.5}>
-        <div className="p-6 rounded-2xl bg-[#121218] border border-[#20202A]">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+      {/* COACH CONNECTION & CHAT BANNER */}
+      <ScrollReveal direction="up" delay={0.115} duration={0.5}>
+        <div className="p-5 sm:p-6 rounded-2xl bg-gradient-to-r from-[#121218] via-[#161820] to-[#121218] border border-[#20202A] relative overflow-hidden flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-[#56A867]/15 border border-[#56A867]/30 flex items-center justify-center text-[#56A867] flex-shrink-0">
+              <MessageSquare className="w-6 h-6" />
+            </div>
             <div>
-              <h3 className="text-lg font-serif font-bold text-white">
-                {language === 'en' ? 'Weekly Activity: Volume vs. Technique' : 'Actividad Semanal: Volumen vs. Técnica'}
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-mono uppercase text-[#56A867] font-bold tracking-wider">
+                  {user.trainerName ? (language === 'en' ? 'Assigned Coach' : 'Coach Asignado') : (language === 'en' ? 'Biomechanical Coach Support' : 'Asesoría y Coach Biomecánico')}
+                </span>
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#56A867]/10 text-[#56A867] text-[10px] font-mono">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#56A867] animate-pulse" />
+                  {language === 'en' ? 'Online' : 'En Línea'}
+                </span>
+              </div>
+              <h3 className="text-base sm:text-lg font-serif font-bold text-white mt-0.5">
+                {assignedCoach.name}
               </h3>
               <p className="text-xs text-[#8E8E9E]">
                 {language === 'en'
-                  ? 'Accumulated volume progression and biomechanical accuracy score.'
-                  : 'Progresión de carga acumulada y score de precisión biomecánica.'}
+                  ? 'Direct 1-on-1 communication channel for technique calibration, overload feedback, and 1RM reviews.'
+                  : 'Canal directo 1-a-1 para calibración de técnica, progresión de sobrecarga y revisión de 1RM.'}
               </p>
             </div>
-
-            {/* Time range selector */}
-            <div className="p-1 rounded-xl bg-[#181822] border border-[#272734] flex items-center gap-1 text-xs font-mono">
-              {(['1M', '3M', 'YTD'] as const).map((r) => (
-                <button
-                  key={r}
-                  onClick={() => setTimeRange(r)}
-                  className={`px-3 py-1 rounded-lg transition-colors ${
-                    timeRange === r
-                      ? 'bg-[#56A867] text-black font-bold'
-                      : 'text-[#8E8E9E] hover:text-white'
-                  }`}
-                >
-                  {r}
-                </button>
-              ))}
-            </div>
           </div>
 
-          {/* Bar chart visualization */}
-          <div className="h-48 flex items-end gap-2 sm:gap-4 pt-4 border-b border-[#20202A]">
-            {chartData.map((item, index) => {
-              const heightPercent = item.volume > 0
-                ? Math.max(8, Math.round((item.volume / maxVolume) * 100))
-                : 3;
-              return (
-                <div
-                  key={index}
-                  className="flex-1 flex flex-col items-center gap-2 h-full justify-end group cursor-pointer"
-                >
-                  <div
-                    className="w-full rounded-t-lg transition-all duration-300 relative group-hover:brightness-125"
-                    style={{
-                      height: `${heightPercent}%`,
-                      backgroundColor: item.volume > 0 ? (item.isToday ? '#56A867' : '#2A3A2E') : '#181822',
-                    }}
-                  >
-                    <div
-                      className="absolute -top-1 w-full h-1 rounded-full"
-                      style={{ backgroundColor: item.volume > 0 ? (item.isToday ? '#64B875' : '#3D5542') : '#252535' }}
-                    />
-                  </div>
-
-                  <span
-                    className={`text-xs font-mono tabular-nums ${
-                      item.isToday ? 'text-[#56A867] font-bold' : 'text-neutral-400'
-                    }`}
-                  >
-                    {item.day}
-                  </span>
-                  <span className="text-[10px] text-[#555566] font-mono hidden sm:inline">
-                    {item.volume > 0 ? `${(item.volume / 1000).toFixed(1)}k` : '0 kg'}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-
-          <div className="mt-4 flex items-center justify-between text-xs text-[#707080] font-mono">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-1.5">
-                <span className="w-3 h-3 rounded bg-[#56A867]" />
-                <span className="text-white">{language === 'en' ? 'Load Volume (kg)' : 'Volumen de Carga (kg)'}</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-[#64B875]" />
-                <span>{language === 'en' ? 'Biomechanical Accuracy (%)' : 'Precisión Biomecánica (%)'}</span>
-              </div>
-            </div>
-            <span>{language === 'en' ? 'Updated in real time' : 'Actualizado en tiempo real'}</span>
-          </div>
+          <button
+            onClick={() => setIsCoachChatOpen(true)}
+            className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-[#56A867] hover:bg-[#64B875] text-black font-bold text-xs font-mono uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-[0_0_20px_rgba(86,168,103,0.25)] hover:shadow-[0_0_25px_rgba(86,168,103,0.4)] cursor-pointer"
+          >
+            <MessageSquare className="w-4 h-4 fill-black/20" />
+            <span>{language === 'en' ? 'Chat with Coach' : 'Chatear con mi Coach'}</span>
+          </button>
         </div>
       </ScrollReveal>
+
+      {/* FULL ATHLETE ANALYTICS & SCIENCE CHARTS */}
+      <ScrollReveal direction="up" delay={0.12} duration={0.5}>
+        <AthleteAnalyticsCharts
+          user={user}
+          language={language}
+          onUpdateWeight={(newW) => {
+            setUser({ ...user, weight: newW });
+          }}
+        />
+      </ScrollReveal>
+
+      {/* 1-on-1 COACH & ATHLETE CHAT MODAL */}
+      <CoachAthleteChatModal
+        isOpen={isCoachChatOpen}
+        onClose={() => setIsCoachChatOpen(false)}
+        currentUser={user}
+        otherUser={assignedCoach}
+      />
     </div>
   );
 };

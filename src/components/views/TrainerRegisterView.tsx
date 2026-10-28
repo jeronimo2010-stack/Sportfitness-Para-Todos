@@ -231,6 +231,7 @@ export const TrainerRegisterView: React.FC<TrainerRegisterViewProps> = ({
     setIsSendingCode(true);
     setErrorMessage('');
     setCodeNotification(null);
+    setInputCode(''); // Never auto-fill: keep inputs empty so user enters the code manually
     try {
       const res = await authService.sendVerificationCode(email.trim(), 'register_trainer');
       if (res.success) {
@@ -241,10 +242,9 @@ export const TrainerRegisterView: React.FC<TrainerRegisterViewProps> = ({
         if (theCode) {
           const cleanC = String(theCode).trim();
           setAvailableCode(cleanC);
-          setInputCode(cleanC);
-        } else {
-          setInputCode('');
         }
+        // Explicitly clear inputCode so the 6-digit boxes start empty
+        setInputCode('');
 
         if (res.pendingVerificationToken) {
           setPendingToken(res.pendingVerificationToken);

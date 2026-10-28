@@ -3,7 +3,19 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { UserProfile, DocumentType, StoredCredentialRecord, UserRole, UserNote, ScheduledSession, DayCalendarOverride, PersonalRecordFolder, PersonalStrengthRecord } from '../types';
+import {
+  UserProfile,
+  DocumentType,
+  StoredCredentialRecord,
+  UserRole,
+  UserNote,
+  ScheduledSession,
+  DayCalendarOverride,
+  PersonalRecordFolder,
+  PersonalStrengthRecord,
+  CoachDirectChatMessage,
+  WeeklyWeighInLog,
+} from '../types';
 import { initialCalendarSessions } from '../data/initialData';
 
 const STORAGE_KEYS = {
@@ -19,6 +31,8 @@ const STORAGE_KEYS = {
   CALENDAR_OVERRIDES: 'sportfitness_calendar_overrides_v3',
   PERSONAL_RECORDS: 'sportfitness_personal_records_v3',
   RECORD_FOLDERS: 'sportfitness_record_folders_v3',
+  CHAT_MESSAGES: 'sportfitness_chat_messages_v3',
+  WEEKLY_WEIGH_INS: 'sportfitness_weekly_weigh_ins_v3',
 };
 
 export const INITIAL_CREDENTIAL_RECORDS: StoredCredentialRecord[] = [];
@@ -1326,5 +1340,279 @@ export const localDatabase = {
       return true;
     }
     return false;
+  },
+
+  // --- COACH - ATHLETE ADOPTION SYSTEM ---
+  getRegisteredAthletes(): UserProfile[] {
+    const users = this.getUsers();
+    let athletes = users.filter((u) => u.role === 'atleta');
+
+    // If no athletes exist yet, generate realistic initial athlete profiles so coaches can test adoption immediately
+    if (athletes.length === 0) {
+      const sampleAthletes: UserProfile[] = [
+        {
+          id: 'ath-mateo-01',
+          name: 'Mateo Bedoya',
+          firstName: 'Mateo',
+          lastName: 'Bedoya',
+          email: 'matebede14@gmail.com',
+          role: 'atleta',
+          avatar: '',
+          membershipPlan: 'Performance Pro',
+          weight: 78,
+          height: 178,
+          clothingSize: 'M',
+          bodyType: 'Mesomorfo',
+          fitnessGoal: 'fuerza',
+          weeklyVolumePercent: 75,
+          streakDays: 4,
+          streakDiscountPercent: 4,
+          sessionsThisWeek: 3,
+          activeDaysTotal: 4,
+          totalSessionsCompleted: 6,
+          lastLoginTimestamp: Date.now() - 1000 * 60 * 30,
+        },
+        {
+          id: 'ath-carlos-02',
+          name: 'Carlos Andrés Vélez',
+          firstName: 'Carlos',
+          lastName: 'Vélez',
+          email: 'carlos.velez@gmail.com',
+          role: 'atleta',
+          avatar: '',
+          membershipPlan: 'Elite Access',
+          weight: 84.5,
+          height: 182,
+          clothingSize: 'L',
+          bodyType: 'Mesomorfo',
+          fitnessGoal: 'masa_muscular',
+          weeklyVolumePercent: 90,
+          streakDays: 12,
+          streakDiscountPercent: 12,
+          sessionsThisWeek: 4,
+          activeDaysTotal: 18,
+          totalSessionsCompleted: 24,
+          lastLoginTimestamp: Date.now() - 1000 * 60 * 120,
+        },
+        {
+          id: 'ath-valeria-03',
+          name: 'Valeria Restrepo',
+          firstName: 'Valeria',
+          lastName: 'Restrepo',
+          email: 'valeria.restrepo@gmail.com',
+          role: 'atleta',
+          avatar: '',
+          membershipPlan: 'Performance Pro',
+          weight: 62.0,
+          height: 167,
+          clothingSize: 'S',
+          bodyType: 'Ectomorfo',
+          fitnessGoal: 'bajar_peso',
+          weeklyVolumePercent: 60,
+          streakDays: 7,
+          streakDiscountPercent: 7,
+          sessionsThisWeek: 3,
+          activeDaysTotal: 9,
+          totalSessionsCompleted: 11,
+          lastLoginTimestamp: Date.now() - 1000 * 60 * 240,
+        },
+      ];
+
+      for (const a of sampleAthletes) {
+        this.saveUser(a);
+      }
+      athletes = this.getUsers().filter((u) => u.role === 'atleta');
+    }
+
+    return athletes;
+  },
+
+  adoptAthlete(coachId: string, coachName: string, athleteId: string): { success: boolean; athlete?: UserProfile; message?: string } {
+    const users = this.getUsers();
+    const athleteIdx = users.findIndex((u) => u.id === athleteId);
+    if (athleteIdx < 0) {
+      return { success: false, message: 'Atleta no encontrado en la base de datos.' };
+    }
+
+    // Update athlete's assigned trainer
+    users[athleteIdx] = {
+      ...users[athleteIdx],
+      trainerId: coachId,
+      trainerName: coachName,
+    };
+
+    // Update coach's adopted list
+    const coachIdx = users.findIndex((u) => u.id === coachId);
+    if (coachIdx >= 0) {
+      const currentAdopted = users[coachIdx].adoptedAthletes || [];
+      if (!currentAdopted.includes(athleteId)) {
+        users[coachIdx] = {
+          ...users[coachIdx],
+          adoptedAthletes: [...currentAdopted, athleteId],
+        };
+      }
+    }
+
+    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+
+    // Send an initial system/welcome message into the chat
+    const conversationId = `chat_${coachId}_${athleteId}`;
+    const initialMsg: CoachDirectChatMessage = {
+      id: `msg_${Date.now()}`,
+      conversationId,
+      senderId: coachId,
+      senderName: coachName,
+      senderRole: 'entrenador',
+      recipientId: athleteId,
+      recipientName: users[athleteIdx].name,
+      text: `¡Hola ${users[athleteIdx].name}! Soy tu Coach asignado en Sportfitness. He revisado tu perfil biométrico y a partir de hoy estaré acompañando tu técnica, marcas de 1RM y programación semanal. ¿Cómo te sientes para tu próxima sesión?`,
+      timestamp: Date.now(),
+      read: false,
+    };
+    this.sendChatMessage(initialMsg);
+
+    return {
+      success: true,
+      athlete: users[athleteIdx],
+      message: `Has adoptado exitosamente a ${users[athleteIdx].name}. Canal de chat activado.`,
+    };
+  },
+
+  unadoptAthlete(coachId: string, athleteId: string): boolean {
+    const users = this.getUsers();
+    const athleteIdx = users.findIndex((u) => u.id === athleteId);
+    if (athleteIdx >= 0 && users[athleteIdx].trainerId === coachId) {
+      users[athleteIdx] = {
+        ...users[athleteIdx],
+        trainerId: undefined,
+        trainerName: undefined,
+      };
+    }
+
+    const coachIdx = users.findIndex((u) => u.id === coachId);
+    if (coachIdx >= 0 && users[coachIdx].adoptedAthletes) {
+      users[coachIdx] = {
+        ...users[coachIdx],
+        adoptedAthletes: users[coachIdx].adoptedAthletes?.filter((id) => id !== athleteId),
+      };
+    }
+
+    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+    return true;
+  },
+
+  // --- COACH - ATHLETE REALTIME CHAT PERSISTENCE ---
+  getAllChatMessages(): CoachDirectChatMessage[] {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEYS.CHAT_MESSAGES);
+      if (!raw) return [];
+      return JSON.parse(raw);
+    } catch {
+      return [];
+    }
+  },
+
+  getChatMessages(conversationId: string): CoachDirectChatMessage[] {
+    const all = this.getAllChatMessages();
+    return all
+      .filter((m) => m.conversationId === conversationId)
+      .sort((a, b) => a.timestamp - b.timestamp);
+  },
+
+  sendChatMessage(msg: Omit<CoachDirectChatMessage, 'id' | 'timestamp'> & { id?: string; timestamp?: number }): CoachDirectChatMessage {
+    const all = this.getAllChatMessages();
+    const newMsg: CoachDirectChatMessage = {
+      id: msg.id || `msg_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      conversationId: msg.conversationId,
+      senderId: msg.senderId,
+      senderName: msg.senderName,
+      senderRole: msg.senderRole,
+      recipientId: msg.recipientId,
+      recipientName: msg.recipientName,
+      text: msg.text,
+      timestamp: msg.timestamp || Date.now(),
+      read: false,
+    };
+
+    all.push(newMsg);
+    localStorage.setItem(STORAGE_KEYS.CHAT_MESSAGES, JSON.stringify(all));
+    return newMsg;
+  },
+
+  markChatMessagesAsRead(conversationId: string, readerId: string): void {
+    const all = this.getAllChatMessages();
+    let changed = false;
+    for (const m of all) {
+      if (m.conversationId === conversationId && m.recipientId === readerId && !m.read) {
+        m.read = true;
+        changed = true;
+      }
+    }
+    if (changed) {
+      localStorage.setItem(STORAGE_KEYS.CHAT_MESSAGES, JSON.stringify(all));
+    }
+  },
+
+  // --- WEEKLY WEIGH-IN LOGS WITH COMMENTS ---
+  getWeeklyWeighIns(userId: string): WeeklyWeighInLog[] {
+    try {
+      const key = `${STORAGE_KEYS.WEEKLY_WEIGH_INS}_${userId}`;
+      const raw = localStorage.getItem(key);
+      if (!raw) {
+        // Initialize with default 6-week progression based on user baseline weight
+        const users = this.getUsers();
+        const u = users.find((item) => item.id === userId);
+        const baseW = u?.weight || 78;
+        const initialLogs: WeeklyWeighInLog[] = [
+          { id: 'w-1', userId, weekNumber: 1, date: 'Semana 1', weightKg: parseFloat((baseW + 2.2).toFixed(1)), comment: 'Inicio del microciclo de fuerza', createdAt: '2026-09-15' },
+          { id: 'w-2', userId, weekNumber: 2, date: 'Semana 2', weightKg: parseFloat((baseW + 1.6).toFixed(1)), comment: 'Buena adaptación neuromuscular y digestiva', createdAt: '2026-09-22' },
+          { id: 'w-3', userId, weekNumber: 3, date: 'Semana 3', weightKg: parseFloat((baseW + 0.9).toFixed(1)), comment: 'Semana de alta intensidad RPE 8.5', createdAt: '2026-09-29' },
+          { id: 'w-4', userId, weekNumber: 4, date: 'Semana 4', weightKg: parseFloat((baseW + 0.3).toFixed(1)), comment: 'Descarga activa de volumen', createdAt: '2026-10-06' },
+          { id: 'w-5', userId, weekNumber: 5, date: 'Semana 5', weightKg: parseFloat((baseW - 0.2).toFixed(1)), comment: 'Superávit limpio y récord en peso muerto', createdAt: '2026-10-13' },
+          { id: 'w-6', userId, weekNumber: 6, date: 'Semana 6', weightKg: baseW, comment: 'Peso actual consolidado con técnica óptima', createdAt: '2026-10-20' },
+        ];
+        localStorage.setItem(key, JSON.stringify(initialLogs));
+        return initialLogs;
+      }
+      return JSON.parse(raw);
+    } catch {
+      return [];
+    }
+  },
+
+  saveWeeklyWeighIn(userId: string, weightKg: number, comment?: string): WeeklyWeighInLog {
+    const list = this.getWeeklyWeighIns(userId);
+    const nextWeekNumber = list.length > 0 ? Math.max(...list.map((w) => w.weekNumber)) + 1 : 1;
+    const todayStr = new Date().toISOString().split('T')[0];
+    const newEntry: WeeklyWeighInLog = {
+      id: `w_${Date.now()}`,
+      userId,
+      weekNumber: nextWeekNumber,
+      date: `Semana ${nextWeekNumber}`,
+      weightKg: parseFloat(weightKg.toFixed(1)),
+      comment: comment?.trim() || undefined,
+      createdAt: todayStr,
+    };
+    list.push(newEntry);
+    localStorage.setItem(`${STORAGE_KEYS.WEEKLY_WEIGH_INS}_${userId}`, JSON.stringify(list));
+
+    // Also update the active user's weight
+    const users = this.getUsers();
+    const idx = users.findIndex((u) => u.id === userId);
+    if (idx >= 0) {
+      users[idx].weight = newEntry.weightKg;
+      localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+    }
+
+    return newEntry;
+  },
+
+  updateWeeklyWeighInComment(userId: string, id: string, comment: string): WeeklyWeighInLog | null {
+    const list = this.getWeeklyWeighIns(userId);
+    const item = list.find((w) => w.id === id);
+    if (!item) return null;
+    item.comment = comment.trim();
+    localStorage.setItem(`${STORAGE_KEYS.WEEKLY_WEIGH_INS}_${userId}`, JSON.stringify(list));
+    return item;
   },
 };

@@ -120,6 +120,9 @@ export interface UserProfile {
   specialization?: string;
   trainerId?: string;
   trainerCode?: string;
+  trainerName?: string;
+  adoptedAthletes?: string[]; // Athlete user IDs adopted by this trainer
+  fitnessGoal?: 'bajar_peso' | 'fuerza' | 'masa_muscular';
   credentials?: string;
   weeklyVolumePercent: number;
   streakDays: number;
@@ -406,3 +409,61 @@ export interface PersonalStrengthRecord {
   notes?: string;
   createdAt: string;
 }
+
+export interface CoachDirectChatMessage {
+  id: string;
+  conversationId: string;
+  senderId: string;
+  senderName: string;
+  senderRole: 'entrenador' | 'atleta';
+  recipientId: string;
+  recipientName: string;
+  text: string;
+  timestamp: number;
+  read: boolean;
+}
+
+export type CoachChatMessage = CoachDirectChatMessage;
+
+export interface WeeklyWeighInLog {
+  id: string;
+  userId: string;
+  weekNumber: number;
+  date: string;
+  weightKg: number;
+  comment?: string;
+  createdAt: string;
+}
+
+export interface CardioMetricEntry {
+  day: string;
+  date: string;
+  runningDurationMinutes: number;
+  avgHeartRateBpm: number;
+  distanceKm?: number;
+}
+
+export interface OneRmProgressionEntry {
+  week: string;
+  date: string;
+  deadliftKg: number;
+  squatKg: number;
+  benchKg: number;
+  pullupKg: number;
+}
+
+export interface DailySleepLog {
+  day: string;
+  date: string;
+  hours: number;
+  targetHours: number;
+  quality: 'Óptimo' | 'Adecuado' | 'Deficiente';
+}
+
+export interface DailyCaloriesLog {
+  day: string;
+  date: string;
+  calories: number;
+  targetCalories: number;
+}
+
