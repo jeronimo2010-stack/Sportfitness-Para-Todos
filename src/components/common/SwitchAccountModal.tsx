@@ -22,7 +22,7 @@ import { GoogleSignInButton } from './GoogleSignInButton';
 interface SwitchAccountModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onNavigate: (screen: ScreenId) => void;
+  onNavigate?: (screen: ScreenId) => void;
 }
 
 export const SwitchAccountModal: React.FC<SwitchAccountModalProps> = ({
@@ -54,10 +54,11 @@ export const SwitchAccountModal: React.FC<SwitchAccountModalProps> = ({
       if (res.success && res.user) {
         setUser(res.user);
         onClose();
-        if (res.user.role === 'entrenador') {
-          onNavigate('trainer-overview');
+        const targetScreen = res.user.role === 'entrenador' ? 'trainer-overview' : 'athlete-dashboard';
+        if (onNavigate) {
+          onNavigate(targetScreen);
         } else {
-          onNavigate('athlete-dashboard');
+          window.location.hash = `#/${targetScreen}`;
         }
       } else {
         setErrorMsg(res.error || res.message || 'Usuario no registrado o credenciales inválidas.');

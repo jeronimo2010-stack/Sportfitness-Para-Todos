@@ -157,7 +157,7 @@ export const StaggerItem: React.FC<StaggerItemProps> = ({
   };
 
   return (
-    <motion.div id={id} variants={getVariants()} className={className} {...rest}>
+    <motion.div id={id} variants={getVariants() as any} className={className} {...rest}>
       {children}
     </motion.div>
   );

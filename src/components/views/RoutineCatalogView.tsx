@@ -109,7 +109,7 @@ export const RoutineCatalogView: React.FC<RoutineCatalogViewProps> = ({
       currentUser.height || 175,
       currentUser.weight || 75,
       currentUser.clothingSize || 'M',
-      currentUser.role || 'atleta'
+      currentUser.role === 'entrenador' ? 'entrenador' : 'atleta'
     );
   }, [currentUser.bodyType, currentUser.height, currentUser.weight, currentUser.clothingSize, currentUser.role]);
 

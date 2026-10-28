@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { Component, useState, useEffect } from 'react';
 import { ScreenId, WorkoutRoutine, UserProfile } from './types';
 import { AppProvider, useApp, guestUser } from './context/AppContext';
 import { Header } from './components/common/Header';
@@ -35,6 +35,65 @@ import { SettingsView } from './components/views/SettingsView';
 import { WeeklyNewsView } from './components/views/WeeklyNewsView';
 import { DatabaseManagerView } from './components/views/DatabaseManagerView';
 import { MyAccountView } from './components/views/MyAccountView';
+
+interface ErrorBoundaryProps {
+  children: React.ReactNode;
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error?: Error;
+}
+
+class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  public override state: ErrorBoundaryState = { hasError: false };
+
+  constructor(props: ErrorBoundaryProps) {
+    super(props);
+  }
+
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('ErrorBoundary captured runtime error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-[70vh] flex flex-col items-center justify-center p-6 text-center text-white">
+          <div className="w-14 h-14 rounded-2xl bg-[#56A867]/20 border border-[#56A867]/40 flex items-center justify-center text-[#56A867] mb-4 text-2xl">
+            ⚡
+          </div>
+          <h2 className="text-xl font-bold font-serif mb-2">Reanudación de pantalla</h2>
+          <p className="text-xs text-[#A0A0B0] max-w-md mb-6 leading-relaxed">
+            Se ha restaurado la sesión. Puedes volver al catálogo de rutinas con tus datos intactos.
+          </p>
+          <div className="flex gap-3">
+            <button
+              onClick={() => {
+                this.setState({ hasError: false });
+                window.location.hash = '#/routines';
+              }}
+              className="px-4 py-2.5 rounded-xl bg-[#56A867] hover:bg-[#64B875] text-black font-bold text-xs font-mono uppercase tracking-wider transition-all shadow-md"
+            >
+              Ir a Rutinas
+            </button>
+            <button
+              onClick={() => this.setState({ hasError: false })}
+              className="px-4 py-2.5 rounded-xl bg-[#1A1A24] border border-[#2B2B38] text-white hover:bg-[#252535] text-xs font-mono transition-all"
+            >
+              Reintentar
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 function MainAppContent() {
   const {
@@ -194,125 +253,127 @@ function MainAppContent() {
             !isAuthOrLanding ? 'lg:pl-64' : ''
           }`}
         >
-          {currentScreen === 'landing' && (
-            <LandingView onNavigate={navigateTo} />
-          )}
+          <ErrorBoundary>
+            {currentScreen === 'landing' && (
+              <LandingView onNavigate={navigateTo} />
+            )}
 
-          {currentScreen === 'athlete-login' && (
-            <AthleteLoginView
-              onNavigate={navigateTo}
-              onLoginSuccess={(u) => handleLoginSuccess('atleta', u)}
-            />
-          )}
-
-          {currentScreen === 'athlete-register' && (
-            <AthleteRegisterView
-              onNavigate={navigateTo}
-              onRegisterSuccess={(u) => handleLoginSuccess('atleta', u)}
-            />
-          )}
-
-          {currentScreen === 'trainer-login' && (
-            <TrainerLoginView
-              onNavigate={navigateTo}
-              onLoginSuccess={(u) => handleLoginSuccess('entrenador', u)}
-            />
-          )}
-
-          {currentScreen === 'trainer-register' && (
-            <TrainerRegisterView
-              onNavigate={navigateTo}
-              onRegisterSuccess={(u) => handleLoginSuccess('entrenador', u)}
-            />
-          )}
-
-          {currentScreen === 'athlete-dashboard' && (
-            user.role === 'entrenador' ? (
-              <TrainerOverviewView onNavigate={navigateTo} />
-            ) : (
-              <AthleteDashboardView
+            {currentScreen === 'athlete-login' && (
+              <AthleteLoginView
                 onNavigate={navigateTo}
-                user={user}
+                onLoginSuccess={(u) => handleLoginSuccess('atleta', u)}
               />
-            )
-          )}
+            )}
 
-          {currentScreen === 'trainer-overview' && (
-            <TrainerOverviewView onNavigate={navigateTo} />
-          )}
-
-          {(currentScreen === 'routines' || currentScreen === 'routine-catalog') && (
-            user.role === 'entrenador' ? (
-              <TrainerOverviewView onNavigate={navigateTo} />
-            ) : (
-              <RoutineCatalogView
+            {currentScreen === 'athlete-register' && (
+              <AthleteRegisterView
                 onNavigate={navigateTo}
-                onSelectRoutine={(routine) => setSelectedRoutine(routine)}
-                user={user}
+                onRegisterSuccess={(u) => handleLoginSuccess('atleta', u)}
               />
-            )
-          )}
+            )}
 
-          {currentScreen === 'live-workout' && (
-            user.role === 'entrenador' ? (
-              <TrainerOverviewView onNavigate={navigateTo} />
-            ) : (
-              <LiveWorkoutView
+            {currentScreen === 'trainer-login' && (
+              <TrainerLoginView
                 onNavigate={navigateTo}
-                user={user}
-                selectedRoutine={selectedRoutine}
+                onLoginSuccess={(u) => handleLoginSuccess('entrenador', u)}
               />
-            )
-          )}
+            )}
 
-          {currentScreen === 'calendar' && (
-            <CalendarView onNavigate={navigateTo} />
-          )}
+            {currentScreen === 'trainer-register' && (
+              <TrainerRegisterView
+                onNavigate={navigateTo}
+                onRegisterSuccess={(u) => handleLoginSuccess('entrenador', u)}
+              />
+            )}
 
-          {currentScreen === 'nutrition' && (
-            <NutritionView onNavigate={navigateTo} />
-          )}
+            {currentScreen === 'athlete-dashboard' && (
+              user.role === 'entrenador' ? (
+                <TrainerOverviewView onNavigate={navigateTo} />
+              ) : (
+                <AthleteDashboardView
+                  onNavigate={navigateTo}
+                  user={user}
+                />
+              )
+            )}
 
-          {currentScreen === 'reviews' && (
-            <ReviewsView onNavigate={navigateTo} user={user} />
-          )}
+            {currentScreen === 'trainer-overview' && (
+              <TrainerOverviewView onNavigate={navigateTo} />
+            )}
 
-          {(currentScreen === 'exercises' || currentScreen === 'exercise-library' || currentScreen === 'exercise-videos' || currentScreen === 'videos-tutoriales') && (
-            <ExerciseVideoLibraryView onNavigate={navigateTo} />
-          )}
+            {(currentScreen === 'routines' || currentScreen === 'routine-catalog') && (
+              user.role === 'entrenador' ? (
+                <TrainerOverviewView onNavigate={navigateTo} />
+              ) : (
+                <RoutineCatalogView
+                  onNavigate={navigateTo}
+                  onSelectRoutine={(routine) => setSelectedRoutine(routine)}
+                  user={user}
+                />
+              )
+            )}
 
-          {currentScreen === 'weekly-news' && (
-            <WeeklyNewsView onNavigate={navigateTo} />
-          )}
+            {currentScreen === 'live-workout' && (
+              user.role === 'entrenador' ? (
+                <TrainerOverviewView onNavigate={navigateTo} />
+              ) : (
+                <LiveWorkoutView
+                  onNavigate={navigateTo}
+                  user={user}
+                  selectedRoutine={selectedRoutine}
+                />
+              )
+            )}
 
-          {(currentScreen === 'database' || currentScreen === 'database-manager') && (
-            user.role === 'entrenador' ? (
-              <DatabaseManagerView />
-            ) : (
-              <div className="p-8 max-w-lg mx-auto my-16 text-center rounded-2xl border border-amber-500/30 bg-amber-500/10">
-                <h2 className="text-lg font-serif font-bold text-amber-400 mb-2">
-                  {language === 'en' ? 'Coach Access Only' : 'Acceso Exclusivo para Entrenadores'}
-                </h2>
-                <p className="text-xs text-neutral-300 mb-5 leading-relaxed">
-                  {language === 'en'
-                    ? 'The SQL database management console is strictly reserved for verified coaches and trainers.'
-                    : 'La consola de administración de la base de datos SQL está reservada exclusivamente para cuentas con rol de Entrenador (Coach).'}
-                </p>
-                <button
-                  onClick={() => navigateTo('athlete-dashboard')}
-                  className="px-4 py-2 rounded-xl text-xs font-bold font-mono uppercase bg-[#56A867] hover:bg-[#64B875] text-black transition-all shadow-md"
-                >
-                  {language === 'en' ? 'Return to Dashboard' : 'Volver al Dashboard'}
-                </button>
-              </div>
-            )
-          )}
+            {currentScreen === 'calendar' && (
+              <CalendarView onNavigate={navigateTo} />
+            )}
 
-          {(currentScreen === 'my-account' || currentScreen === 'account') && (
-            <MyAccountView />
-          )}
+            {currentScreen === 'nutrition' && (
+              <NutritionView onNavigate={navigateTo} />
+            )}
 
-          {currentScreen === 'settings' && <SettingsView />}
+            {currentScreen === 'reviews' && (
+              <ReviewsView onNavigate={navigateTo} user={user} />
+            )}
+
+            {(currentScreen === 'exercises' || currentScreen === 'exercise-library' || currentScreen === 'exercise-videos' || currentScreen === 'videos-tutoriales') && (
+              <ExerciseVideoLibraryView onNavigate={navigateTo} />
+            )}
+
+            {currentScreen === 'weekly-news' && (
+              <WeeklyNewsView onNavigate={navigateTo} />
+            )}
+
+            {(currentScreen === 'database' || currentScreen === 'database-manager') && (
+              user.role === 'entrenador' ? (
+                <DatabaseManagerView />
+              ) : (
+                <div className="p-8 max-w-lg mx-auto my-16 text-center rounded-2xl border border-amber-500/30 bg-amber-500/10">
+                  <h2 className="text-lg font-serif font-bold text-amber-400 mb-2">
+                    {language === 'en' ? 'Coach Access Only' : 'Acceso Exclusivo para Entrenadores'}
+                  </h2>
+                  <p className="text-xs text-neutral-300 mb-5 leading-relaxed">
+                    {language === 'en'
+                      ? 'The SQL database management console is strictly reserved for verified coaches and trainers.'
+                      : 'La consola de administración de la base de datos SQL está reservada exclusivamente para cuentas con rol de Entrenador (Coach).'}
+                  </p>
+                  <button
+                    onClick={() => navigateTo('athlete-dashboard')}
+                    className="px-4 py-2 rounded-xl text-xs font-bold font-mono uppercase bg-[#56A867] hover:bg-[#64B875] text-black transition-all shadow-md"
+                  >
+                    {language === 'en' ? 'Return to Dashboard' : 'Volver al Dashboard'}
+                  </button>
+                </div>
+              )
+            )}
+
+            {(currentScreen === 'my-account' || currentScreen === 'account') && (
+              <MyAccountView />
+            )}
+
+            {currentScreen === 'settings' && <SettingsView />}
+          </ErrorBoundary>
         </main>
       </div>
     </div>

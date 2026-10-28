@@ -57,7 +57,7 @@ export const ReviewsView: React.FC<ReviewsViewProps> = ({ onNavigate, user }) =>
   const [content, setContent] = useState('');
 
   const handleOpenAddReview = () => {
-    if (!isAuthenticated || user.role === 'invitado' || !user.email) {
+    if (!isAuthenticated || (user.role as string) === 'invitado' || !user.email) {
       setShowAuthModal(true);
       return;
     }

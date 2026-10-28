@@ -28,7 +28,7 @@ import { localDatabase } from '../../db/localDatabase';
 
 interface PersonalRecordsFolderManagerProps {
   user: UserProfile;
-  language?: 'es' | 'en';
+  language?: string;
   onNavigateToWorkout?: () => void;
   variant?: 'card' | 'section';
 }

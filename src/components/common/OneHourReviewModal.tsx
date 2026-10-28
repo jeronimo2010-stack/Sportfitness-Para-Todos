@@ -9,14 +9,15 @@ import { localDatabase } from '../../db/localDatabase';
 import { useApp } from '../../context/AppContext';
 
 interface OneHourReviewModalProps {
-  isOpen: boolean;
-  onClose: () => void;
+  isOpen?: boolean;
+  onClose?: () => void;
   onReviewSubmitted?: () => void;
+  currentUser?: any;
 }
 
 export const OneHourReviewModal: React.FC<OneHourReviewModalProps> = ({
-  isOpen,
-  onClose,
+  isOpen = false,
+  onClose = () => {},
   onReviewSubmitted,
 }) => {
   const { user } = useApp();

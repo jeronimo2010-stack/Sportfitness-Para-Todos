@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 import { ExerciseItem, ScreenId, WorkoutSet, UserProfile, WorkoutRoutine } from '../../types';
 import { initialExercises } from '../../data/initialData';
-import { useApp } from '../../context/AppContext';
+import { useApp, guestUser } from '../../context/AppContext';
 import { authService } from '../../services/authService';
 import { localDatabase } from '../../db/localDatabase';
 import {
@@ -45,19 +45,84 @@ export const LiveWorkoutView: React.FC<LiveWorkoutViewProps> = ({
   selectedRoutine,
 }) => {
   const { user: contextUser, setUser } = useApp();
-  const currentUser = user || contextUser;
+  const currentUser: UserProfile = user || contextUser || guestUser;
 
   // Calibrated exercises based on user's registered weight, height, and clothing size
-  const rawExerciseList =
-    selectedRoutine?.exercises && selectedRoutine.exercises.length > 0
-      ? selectedRoutine.exercises
-      : initialExercises.slice(0, 3);
+  // Normalizes routine exercises ({exerciseId, name, sets, reps, targetWeightKg}) into complete ExerciseItem objects
+  const rawExerciseList = useMemo<ExerciseItem[]>(() => {
+    if (!selectedRoutine?.exercises || selectedRoutine.exercises.length === 0) {
+      return initialExercises.slice(0, 3);
+    }
+
+    return selectedRoutine.exercises.map((item: any, index: number): ExerciseItem => {
+      // Find matching template in initialExercises by id or name
+      const base = initialExercises.find(
+        (b) =>
+          b.id === item.exerciseId ||
+          b.id === item.id ||
+          b.name.toLowerCase() === (item.name || '').toLowerCase() ||
+          item.name?.toLowerCase().includes(b.name.toLowerCase()) ||
+          b.name.toLowerCase().includes((item.name || '').toLowerCase())
+      );
+
+      const exerciseId = item.exerciseId || item.id || base?.id || `ex-routine-${index}`;
+      const exerciseName = item.name || base?.name || `Ejercicio ${index + 1}`;
+      const defaultSets = Number(item.sets) || base?.defaultSets || 4;
+      const targetRepsRange = item.reps || base?.targetRepsRange || '8-10 reps';
+
+      const cues =
+        base?.biomechanicalCues && base.biomechanicalCues.length > 0
+          ? base.biomechanicalCues
+          : [
+              'Mantén el bracing intra-abdominal activo y la columna neutra.',
+              'Controla la fase excéntrica en 2-3 segundos antes del empuje concéntrico.',
+              'Aceleración explosiva en el despegue manteniendo la alineación articular.',
+            ];
+
+      const mistakes =
+        base?.commonMistakes && base.commonMistakes.length > 0
+          ? base.commonMistakes
+          : ['Pérdida de alineación articular', 'Movimiento acelerado sin control excéntrico'];
+
+      const thumb =
+        base?.videoThumbnail ||
+        (exerciseName.toLowerCase().includes('pecho') || exerciseName.toLowerCase().includes('banca')
+          ? 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=600&auto=format&fit=crop&q=80'
+          : exerciseName.toLowerCase().includes('muerto') ||
+            exerciseName.toLowerCase().includes('clean') ||
+            exerciseName.toLowerCase().includes('salto')
+          ? 'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?w=600&auto=format&fit=crop&q=80'
+          : 'https://images.unsplash.com/photo-1574680096145-d05b474e2155?w=600&auto=format&fit=crop&q=80');
+
+      return {
+        id: exerciseId,
+        name: exerciseName,
+        category: (base?.category || 'Piernas') as ExerciseItem['category'],
+        primaryMuscle: base?.primaryMuscle || 'Grupo Muscular Principal',
+        description:
+          base?.description ||
+          `Ejercicio biomecánicamente guiado con prescripción de ${defaultSets} series.`,
+        biomechanicalCues: cues,
+        commonMistakes: mistakes,
+        videoThumbnail: thumb,
+        videoUrl: base?.videoUrl,
+        defaultSets,
+        targetRepsRange,
+        historyLogs: base?.historyLogs || [],
+      };
+    });
+  }, [selectedRoutine]);
 
   const calibratedExercises = useMemo(() => {
     return rawExerciseList.map((ex) => getCalibratedExerciseItem(ex, currentUser));
   }, [rawExerciseList, currentUser]);
 
   const [activeExerciseIndex, setActiveExerciseIndex] = useState(0);
+
+  // Reset active exercise index when a new routine is loaded
+  useEffect(() => {
+    setActiveExerciseIndex(0);
+  }, [selectedRoutine?.id]);
 
   // Active workout timer
   const [elapsedSeconds, setElapsedSeconds] = useState(1458); // ~24 min
@@ -303,7 +368,7 @@ export const LiveWorkoutView: React.FC<LiveWorkoutViewProps> = ({
                 const exTargetLoad = getExerciseLoadForUser(ex.name || ex.id, currentUser);
                 return (
                   <button
-                    key={ex.id}
+                    key={ex.id || (ex as any).exerciseId || index}
                     onClick={() => setActiveExerciseIndex(index)}
                     className={`w-full p-3 rounded-xl text-left text-xs transition-all flex items-center justify-between border ${
                       isActive
@@ -328,7 +393,7 @@ export const LiveWorkoutView: React.FC<LiveWorkoutViewProps> = ({
                       <div className="truncate">
                         <div className="font-semibold truncate">{ex.name}</div>
                         <div className="text-[10px] text-[#707080] font-mono flex items-center gap-1.5">
-                          <span>{ex.defaultSets} × {ex.targetRepsRange}</span>
+                          <span>{ex.defaultSets || (ex as any).sets || 4} × {ex.targetRepsRange || (ex as any).reps || '8-10 reps'}</span>
                           <span>•</span>
                           <span className="text-[#56A867] font-bold">@{exTargetLoad}kg</span>
                         </div>
@@ -345,7 +410,8 @@ export const LiveWorkoutView: React.FC<LiveWorkoutViewProps> = ({
               Cue Biomecánico
             </span>
             <p className="text-[#A0A0B0] text-[11px] leading-relaxed">
-              {currentExercise.biomechanicalCues[0]}
+              {(currentExercise.biomechanicalCues && currentExercise.biomechanicalCues[0]) ||
+                'Mantén la columna neutra y el control neuromuscular.'}
             </p>
           </div>
         </div>
@@ -355,13 +421,19 @@ export const LiveWorkoutView: React.FC<LiveWorkoutViewProps> = ({
           {/* Exercise Visual Container */}
           <div className="relative rounded-xl overflow-hidden h-48 sm:h-56 bg-[#0E0E12] border border-[#22222C]">
             <img
-              src={currentExercise.videoThumbnail}
+              src={
+                currentExercise.videoThumbnail ||
+                'https://images.unsplash.com/photo-1574680096145-d05b474e2155?w=600&auto=format&fit=crop&q=80'
+              }
               alt={currentExercise.name}
               className="w-full h-full object-cover opacity-60"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-[#121218] via-transparent to-transparent" />
             <div className="absolute top-3 left-3 px-2.5 py-1 rounded-full bg-black/80 backdrop-blur-md border border-[#56A867]/40 text-[#56A867] text-[10px] font-mono font-bold uppercase">
-              {currentExercise.primaryMuscleGroup}
+              {currentExercise.primaryMuscle ||
+                (currentExercise as any).primaryMuscleGroup ||
+                currentExercise.category ||
+                'Fuerza'}
             </div>
             <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
               <div>
@@ -592,10 +664,10 @@ export const LiveWorkoutView: React.FC<LiveWorkoutViewProps> = ({
                 Sesión Concluida Con Éxito
               </span>
               <h2 className="text-2xl font-serif font-bold text-white mt-1">
-                ¡Gran Trabajo, {currentUser.name.split(' ')[0]}!
+                ¡Gran Trabajo, {(currentUser?.name || 'Atleta').split(' ')[0]}!
               </h2>
               <p className="text-xs text-[#9E9EA8] mt-1">
-                Tus métricas de carga han sido sincronizadas con tu cuenta y perfil ({currentUser.weight || 78} kg • Talla {currentUser.clothingSize || 'M'}).
+                Tus métricas de carga han sido sincronizadas con tu cuenta y perfil ({currentUser?.weight || 78} kg • Talla {currentUser?.clothingSize || 'M'}).
               </p>
             </div>
 
