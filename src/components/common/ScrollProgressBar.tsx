@@ -6,12 +6,14 @@
 import React from 'react';
 import { motion, useScroll, useSpring } from 'motion/react';
 import { ChevronUp } from 'lucide-react';
+import { useApp } from '../../context/AppContext';
 
 interface ScrollProgressBarProps {
   showBackToTop?: boolean;
 }
 
 export const ScrollProgressBar: React.FC<ScrollProgressBarProps> = ({ showBackToTop = true }) => {
+  const { t } = useApp();
   const { scrollYProgress, scrollY } = useScroll();
   const scaleX = useSpring(scrollYProgress, {
     stiffness: 120,
@@ -51,8 +53,8 @@ export const ScrollProgressBar: React.FC<ScrollProgressBarProps> = ({ showBackTo
           className={`fixed bottom-6 right-6 z-40 p-3 rounded-full shadow-xl border backdrop-blur-md flex items-center justify-center transition-colors cursor-pointer bg-[#14141E]/85 border-[#2A2A3D] text-[#56A867] hover:text-white hover:bg-[#56A867] hover:border-[#56A867] group ${
             visible ? 'pointer-events-auto' : 'pointer-events-none'
           }`}
-          aria-label="Volver arriba"
-          title="Volver arriba"
+          aria-label={t('common.backToTop')}
+          title={t('common.backToTop')}
         >
           <ChevronUp className="w-5 h-5 transition-transform group-hover:-translate-y-0.5" />
         </motion.button>

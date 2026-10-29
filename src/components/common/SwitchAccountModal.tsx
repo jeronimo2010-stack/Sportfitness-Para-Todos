@@ -30,7 +30,7 @@ export const SwitchAccountModal: React.FC<SwitchAccountModalProps> = ({
   onClose,
   onNavigate,
 }) => {
-  const { user, setUser, logout } = useApp();
+  const { user, setUser, logout, t } = useApp();
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -44,7 +44,7 @@ export const SwitchAccountModal: React.FC<SwitchAccountModalProps> = ({
 
     const clean = identifier.trim();
     if (!clean || !password) {
-      setErrorMsg('Ingresa el correo/documento y la contraseña.');
+      setErrorMsg(t('switchAccount.missingFields'));
       return;
     }
 
@@ -61,10 +61,10 @@ export const SwitchAccountModal: React.FC<SwitchAccountModalProps> = ({
           window.location.hash = `#/${targetScreen}`;
         }
       } else {
-        setErrorMsg(res.error || res.message || 'Usuario no registrado o credenciales inválidas.');
+        setErrorMsg(res.error || res.message || t('switchAccount.invalidCredentials'));
       }
     } catch {
-      setErrorMsg('Error al verificar credenciales con la base de datos.');
+      setErrorMsg(t('switchAccount.dbError'));
     } finally {
       setLoading(false);
     }
@@ -84,10 +84,10 @@ export const SwitchAccountModal: React.FC<SwitchAccountModalProps> = ({
             <Shield className="w-5 h-5 text-[#56A867]" />
             <div>
               <h3 className="text-sm font-bold text-white font-serif uppercase tracking-wider">
-                Cambio Seguro de Cuenta
+                {t('switchAccount.modalTitle')}
               </h3>
               <p className="text-[10px] font-mono text-[#8E8E9E]">
-                Privacidad absoluta: no se muestran cuentas almacenadas
+                {t('switchAccount.privacySubtitle')}
               </p>
             </div>
           </div>
@@ -106,10 +106,10 @@ export const SwitchAccountModal: React.FC<SwitchAccountModalProps> = ({
               <UserAvatar user={user} size="sm" className="w-9 h-9 shrink-0" />
               <div className="min-w-0">
                 <div className="text-[10px] font-mono text-[#56A867] uppercase font-bold">
-                  Sesión Actual Activa
+                  {t('switchAccount.activeSessionTag')}
                 </div>
                 <div className="text-xs font-bold text-white truncate">{user.name}</div>
-                <div className="text-[10px] text-[#8E8E9E] truncate">{user.email || 'Sin correo visible'}</div>
+                <div className="text-[10px] text-[#8E8E9E] truncate">{user.email || t('switchAccount.noEmail')}</div>
               </div>
             </div>
 
@@ -118,7 +118,7 @@ export const SwitchAccountModal: React.FC<SwitchAccountModalProps> = ({
               className="px-3 py-1.5 rounded-lg bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 text-xs font-mono font-bold flex items-center gap-1.5 transition-all"
             >
               <LogOut className="w-3.5 h-3.5" />
-              <span>Cerrar Sesión</span>
+              <span>{t('logout')}</span>
             </button>
           </div>
         </div>
@@ -128,10 +128,10 @@ export const SwitchAccountModal: React.FC<SwitchAccountModalProps> = ({
           <div className="text-left space-y-1">
             <h4 className="text-xs font-bold text-white uppercase tracking-wider font-mono flex items-center gap-1.5">
               <KeyRound className="w-3.5 h-3.5 text-[#56A867]" />
-              <span>Autenticar Otra Cuenta</span>
+              <span>{t('switchAccount.authAnother')}</span>
             </h4>
             <p className="text-[11px] text-[#8E8E9E]">
-              Ingresa el correo o documento y contraseña de la otra cuenta para cambiar de perfil de forma segura.
+              {t('switchAccount.authAnotherDesc')}
             </p>
           </div>
 
@@ -145,14 +145,14 @@ export const SwitchAccountModal: React.FC<SwitchAccountModalProps> = ({
           <form onSubmit={handleSecureSwitch} autoComplete="off" className="space-y-3">
             <div className="space-y-1 text-left">
               <label className="text-[11px] font-mono text-[#A0A0B0]">
-                Correo o Documento de Identidad
+                {t('switchAccount.idLabel')}
               </label>
               <input
                 type="text"
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value)}
                 autoComplete="off"
-                placeholder="Correo electrónico o documento"
+                placeholder={t('switchAccount.idPlaceholder')}
                 required
                 className="w-full bg-[#181824] text-xs text-white px-3 py-2.5 rounded-xl border border-[#252538] focus:border-[#56A867] focus:outline-none placeholder-[#606070]"
               />
@@ -160,7 +160,7 @@ export const SwitchAccountModal: React.FC<SwitchAccountModalProps> = ({
 
             <div className="space-y-1 text-left">
               <label className="text-[11px] font-mono text-[#A0A0B0]">
-                Contraseña
+                {t('switchAccount.passwordLabel')}
               </label>
               <input
                 type="password"
@@ -179,14 +179,14 @@ export const SwitchAccountModal: React.FC<SwitchAccountModalProps> = ({
                 onClick={onClose}
                 className="flex-1 py-2.5 px-4 rounded-xl border border-[#28283A] text-xs font-mono text-[#A0A0B0] hover:text-white hover:bg-[#1A1A26] transition-all"
               >
-                Cancelar
+                {t('cancel')}
               </button>
               <button
                 type="submit"
                 disabled={loading}
                 className="flex-1 py-2.5 px-4 rounded-xl bg-[#56A867] hover:bg-[#64B875] text-black font-bold text-xs font-mono uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all shadow-md"
               >
-                <span>{loading ? 'Verificando...' : 'Cambiar Cuenta'}</span>
+                <span>{loading ? t('switchAccount.verifying') : t('switchAccount.switchBtn')}</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>
@@ -195,7 +195,7 @@ export const SwitchAccountModal: React.FC<SwitchAccountModalProps> = ({
           {/* Google Quick Switch */}
           <div className="pt-3 border-t border-[#222230]">
             <GoogleSignInButton
-              text="Cambiar con cuenta de Google"
+              text={t('switchAccount.googleSwitch')}
               onSuccess={(switchedUser) => {
                 setUser(switchedUser);
                 onClose();

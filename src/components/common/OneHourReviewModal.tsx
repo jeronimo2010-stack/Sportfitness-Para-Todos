@@ -20,7 +20,7 @@ export const OneHourReviewModal: React.FC<OneHourReviewModalProps> = ({
   onClose = () => {},
   onReviewSubmitted,
 }) => {
-  const { user } = useApp();
+  const { user, t } = useApp();
   const [rating, setRating] = useState<number>(5);
   const [hoverRating, setHoverRating] = useState<number>(0);
   const [positiveComment, setPositiveComment] = useState('');
@@ -34,11 +34,11 @@ export const OneHourReviewModal: React.FC<OneHourReviewModalProps> = ({
     if (!positiveComment.trim()) return;
 
     localDatabase.addReview(
-      user.name || 'Atleta Sportfitness',
-      user.role === 'entrenador' ? 'Entrenador Certificado' : 'Atleta en Entrenamiento',
+      user.name || t('common.userFallback'),
+      user.role === 'entrenador' ? t('reviewModal.defaultCoachRole') : t('reviewModal.defaultAthleteRole'),
       rating,
       positiveComment,
-      improvementComment || 'Excelente plataforma integral.'
+      improvementComment || t('reviewModal.defaultImprovement')
     );
 
     setSubmitted(true);
@@ -56,7 +56,7 @@ export const OneHourReviewModal: React.FC<OneHourReviewModalProps> = ({
         <div className="p-4 sm:px-6 py-3.5 border-b border-[#222230] flex items-center justify-between bg-[#161622]">
           <div className="flex items-center gap-2 text-xs font-mono text-[#56A867] uppercase font-bold tracking-wider">
             <Sparkles className="w-4 h-4" />
-            <span>Valoración de Experiencia • 1 Hora de Uso</span>
+            <span>{t('reviewModal.oneHourBadge')}</span>
           </div>
           <button
             onClick={onClose}
@@ -73,25 +73,25 @@ export const OneHourReviewModal: React.FC<OneHourReviewModalProps> = ({
               <div className="w-14 h-14 rounded-full bg-[#56A867]/15 text-[#56A867] mx-auto flex items-center justify-center">
                 <CheckCircle2 className="w-8 h-8" />
               </div>
-              <h3 className="text-xl font-bold font-serif text-white">¡Muchas Gracias por tu Reseña!</h3>
+              <h3 className="text-xl font-bold font-serif text-white">{t('reviewModal.thankYouTitle')}</h3>
               <p className="text-xs text-[#9E9EA8] max-w-xs mx-auto">
-                Tu opinión ya fue integrada al promedio general de estrellas para guiar a nuevos atletas y entrenadores.
+                {t('reviewModal.thankYouDesc')}
               </p>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <h3 className="text-lg font-bold font-serif text-white">
-                  ¿Te ha gustado tu experiencia en Sportfitness?
+                  {t('reviewModal.questionTitle')}
                 </h3>
                 <p className="text-xs text-[#8E8E9E] mt-1">
-                  Has completado sesiones en la plataforma. Tu calificación nos permite recalcular el promedio general en tiempo real.
+                  {t('reviewModal.questionSubtitle')}
                 </p>
               </div>
 
               {/* Star Picker */}
               <div className="p-3.5 rounded-xl bg-[#171724] border border-[#252538] flex flex-col items-center justify-center gap-2">
-                <span className="text-xs font-mono text-[#A0A0B0]">Selecciona de 1 a 5 estrellas:</span>
+                <span className="text-xs font-mono text-[#A0A0B0]">{t('reviewModal.selectStars')}</span>
                 <div className="flex items-center gap-1.5">
                   {[1, 2, 3, 4, 5].map((star) => (
                     <button
@@ -113,11 +113,11 @@ export const OneHourReviewModal: React.FC<OneHourReviewModalProps> = ({
                   ))}
                 </div>
                 <span className="text-xs font-mono font-bold text-[#FFB800]">
-                  {rating === 5 && '★★★★★ ¡Excelente (5/5)!'}
-                  {rating === 4 && '★★★★☆ Muy Buena (4/5)'}
-                  {rating === 3 && '★★★☆☆ Aceptable (3/5)'}
-                  {rating === 2 && '★★☆☆☆ Regular (2/5)'}
-                  {rating === 1 && '★☆☆☆☆ Requiere Mejoras (1/5)'}
+                  {rating === 5 && t('reviewModal.rating5')}
+                  {rating === 4 && t('reviewModal.rating4')}
+                  {rating === 3 && t('reviewModal.rating3')}
+                  {rating === 2 && t('reviewModal.rating2')}
+                  {rating === 1 && t('reviewModal.rating1')}
                 </span>
               </div>
 
@@ -125,14 +125,14 @@ export const OneHourReviewModal: React.FC<OneHourReviewModalProps> = ({
               <div className="space-y-1">
                 <label className="text-xs font-mono text-neutral-300 font-bold flex items-center gap-1.5">
                   <ThumbsUp className="w-3.5 h-3.5 text-[#56A867]" />
-                  <span>¿Qué fue lo que más te gustó? (Comentario positivo)</span>
+                  <span>{t('reviewModal.positiveLabel')}</span>
                 </label>
                 <textarea
                   required
                   rows={2}
                   value={positiveComment}
                   onChange={(e) => setPositiveComment(e.target.value)}
-                  placeholder="Ej. Me encantaron los videos cortos, los materiales caseros y la racha con 1% de descuento diario..."
+                  placeholder={t('reviewModal.positivePlaceholder')}
                   className="w-full bg-[#161622] border border-[#252538] focus:border-[#56A867] rounded-xl p-2.5 text-xs text-white placeholder-[#606070] focus:outline-none"
                 />
               </div>
@@ -141,13 +141,13 @@ export const OneHourReviewModal: React.FC<OneHourReviewModalProps> = ({
               <div className="space-y-1">
                 <label className="text-xs font-mono text-neutral-300 font-bold flex items-center gap-1.5">
                   <HelpCircle className="w-3.5 h-3.5 text-amber-400" />
-                  <span>¿Qué podemos mejorar para dar una mejor experiencia a nuevos usuarios?</span>
+                  <span>{t('reviewModal.improvementLabel')}</span>
                 </label>
                 <textarea
                   rows={2}
                   value={improvementComment}
                   onChange={(e) => setImprovementComment(e.target.value)}
-                  placeholder="Ej. Añadir más opciones de estiramientos o retos semanales..."
+                  placeholder={t('reviewModal.improvementPlaceholder')}
                   className="w-full bg-[#161622] border border-[#252538] focus:border-[#56A867] rounded-xl p-2.5 text-xs text-white placeholder-[#606070] focus:outline-none"
                 />
               </div>
@@ -159,13 +159,13 @@ export const OneHourReviewModal: React.FC<OneHourReviewModalProps> = ({
                   onClick={onClose}
                   className="px-4 py-2 rounded-xl bg-[#1C1C28] hover:bg-[#252535] text-xs font-mono text-[#8E8E9E] transition-colors"
                 >
-                  Recordarme más tarde
+                  {t('reviewModal.remindLater')}
                 </button>
                 <button
                   type="submit"
                   className="px-5 py-2 rounded-xl bg-[#56A867] hover:bg-[#64B875] text-black text-xs font-mono font-bold uppercase tracking-wider transition-all shadow-[0_0_15px_rgba(86,168,103,0.25)]"
                 >
-                  Publicar Reseña
+                  {t('reviewModal.submitBtn')}
                 </button>
               </div>
             </form>

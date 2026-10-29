@@ -26,7 +26,7 @@ interface ContactModalProps {
 }
 
 export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) => {
-  const { theme, language, user } = useApp();
+  const { theme, language, user, t } = useApp();
   const isDark = theme === 'dark';
 
   const [name, setName] = useState(user?.name ? `${user.name} ${user.lastName || ''}`.trim() : '');
@@ -46,19 +46,15 @@ export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) =
     setError('');
 
     if (!name.trim()) {
-      setError(language === 'es' ? 'Por favor ingresa tu nombre completo.' : 'Please enter your full name.');
+      setError(t('contactModal.errName'));
       return;
     }
     if (!email.trim() || !email.includes('@')) {
-      setError(language === 'es' ? 'Ingresa un correo electrónico válido.' : 'Please enter a valid email address.');
+      setError(t('contactModal.errEmail'));
       return;
     }
     if (!message.trim() || message.trim().length < 10) {
-      setError(
-        language === 'es'
-          ? 'El mensaje debe contener al menos 10 caracteres explicativos.'
-          : 'Your message must be at least 10 characters.'
-      );
+      setError(t('contactModal.errMessage'));
       return;
     }
 
@@ -66,7 +62,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) =
 
     try {
       const cleanEmail = email.trim().toLowerCase();
-      const resolvedSubject = subject.trim() || (language === 'es' ? `Contacto de ${name.trim()}` : `Contact from ${name.trim()}`);
+      const resolvedSubject = subject.trim() || `${t('contactModal.subjectDefault')} ${name.trim()}`;
 
       // 1. Save document to Firestore 'mail' collection (Firebase Trigger Email Extension)
       try {
@@ -145,12 +141,10 @@ export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) =
             </div>
             <div>
               <h3 className="font-bold text-base leading-tight">
-                {language === 'es' ? 'Contacto y Soporte Sportfitness' : 'Sportfitness Contact & Support'}
+                {t('contactModal.title')}
               </h3>
               <p className={`text-[11px] ${isDark ? 'text-neutral-400' : 'text-slate-500'}`}>
-                {language === 'es'
-                  ? 'Envío directo por SendGrid y Firebase Mail'
-                  : 'Direct delivery via SendGrid & Firebase Mail'}
+                {t('contactModal.subtitle')}
               </p>
             </div>
           </div>
@@ -173,12 +167,10 @@ export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) =
               </div>
               <div className="space-y-1">
                 <h4 className="text-lg font-bold">
-                  {language === 'es' ? '¡Mensaje Enviado con Éxito!' : 'Message Sent Successfully!'}
+                  {t('contactModal.successTitle')}
                 </h4>
                 <p className={`text-xs max-w-sm mx-auto ${isDark ? 'text-neutral-300' : 'text-slate-600'}`}>
-                  {language === 'es'
-                    ? 'Tu consulta fue registrada en la colección mail y enviada mediante SendGrid. Nuestro equipo te responderá a la brevedad.'
-                    : 'Your message has been saved to the mail collection and dispatched via SendGrid. Our staff will get back to you shortly.'}
+                  {t('contactModal.successDesc')}
                 </p>
               </div>
               <div
@@ -188,18 +180,18 @@ export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) =
               >
                 <div className="flex items-center gap-1.5 text-[#56A867] font-semibold mb-1">
                   <Sparkles className="w-3.5 h-3.5" />
-                  <span>{language === 'es' ? 'Confirmación de entrega:' : 'Delivery receipt:'}</span>
+                  <span>{t('contactModal.receiptTitle')}</span>
                 </div>
-                <div>• Destinatario: mateobedoy20@gmail.com</div>
-                <div>• Copia de acuse enviada a: {email}</div>
-                <div>• Motor: SendGrid v3 + Firebase Trigger Email</div>
+                <div>• {t('contactModal.recipientLabel')}</div>
+                <div>• {t('contactModal.copyLabel')} {email}</div>
+                <div>• {t('contactModal.engineLabel')}</div>
               </div>
               <button
                 type="button"
                 onClick={handleReset}
                 className="mt-2 w-full py-2.5 rounded-xl font-bold text-xs bg-[#56A867] hover:bg-[#64B875] text-black transition-all cursor-pointer"
               >
-                {language === 'es' ? 'Cerrar y Continuar' : 'Close and Continue'}
+                {t('contactModal.closeBtn')}
               </button>
             </div>
           ) : (
@@ -215,7 +207,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) =
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <label className={`block text-xs font-semibold ${isDark ? 'text-neutral-300' : 'text-slate-700'}`}>
-                    {language === 'es' ? 'Nombre completo *' : 'Full Name *'}
+                    {t('contactModal.fullName')}
                   </label>
                   <div className="relative">
                     <User className="w-4 h-4 absolute left-3 top-3 text-neutral-400" />
@@ -224,7 +216,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) =
                       required
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      placeholder={language === 'es' ? 'Ej. Mateo Bedoya' : 'e.g. John Doe'}
+                      placeholder={t('contactModal.namePlaceholder')}
                       className={`w-full pl-9 pr-3 py-2 rounded-xl text-xs border outline-none transition-all ${
                         isDark
                           ? 'bg-[#181824] border-[#2A2A3C] text-white focus:border-[#56A867]'
@@ -236,7 +228,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) =
 
                 <div className="space-y-1">
                   <label className={`block text-xs font-semibold ${isDark ? 'text-neutral-300' : 'text-slate-700'}`}>
-                    {language === 'es' ? 'Correo electrónico *' : 'Email Address *'}
+                    {t('contactModal.emailAddress')}
                   </label>
                   <div className="relative">
                     <Mail className="w-4 h-4 absolute left-3 top-3 text-neutral-400" />
@@ -245,7 +237,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) =
                       required
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      placeholder={language === 'en' ? 'Email address' : 'Correo electrónico'}
+                      placeholder={t('contactModal.emailPlaceholder')}
                       className={`w-full pl-9 pr-3 py-2 rounded-xl text-xs border outline-none transition-all ${
                         isDark
                           ? 'bg-[#181824] border-[#2A2A3C] text-white focus:border-[#56A867]'
@@ -260,7 +252,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) =
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <label className={`block text-xs font-semibold ${isDark ? 'text-neutral-300' : 'text-slate-700'}`}>
-                    {language === 'es' ? 'Teléfono / WhatsApp' : 'Phone / WhatsApp'}
+                    {t('contactModal.phone')}
                   </label>
                   <div className="relative">
                     <Phone className="w-4 h-4 absolute left-3 top-3 text-neutral-400" />
@@ -280,7 +272,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) =
 
                 <div className="space-y-1">
                   <label className={`block text-xs font-semibold ${isDark ? 'text-neutral-300' : 'text-slate-700'}`}>
-                    {language === 'es' ? 'Asunto' : 'Subject'}
+                    {t('contactModal.subject')}
                   </label>
                   <div className="relative">
                     <HelpCircle className="w-4 h-4 absolute left-3 top-3 text-neutral-400" />
@@ -288,7 +280,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) =
                       type="text"
                       value={subject}
                       onChange={(e) => setSubject(e.target.value)}
-                      placeholder={language === 'es' ? 'Consulta sobre planes o soporte' : 'Inquiry or support'}
+                      placeholder={t('contactModal.subjectPlaceholder')}
                       className={`w-full pl-9 pr-3 py-2 rounded-xl text-xs border outline-none transition-all ${
                         isDark
                           ? 'bg-[#181824] border-[#2A2A3C] text-white focus:border-[#56A867]'
@@ -302,7 +294,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) =
               {/* Message */}
               <div className="space-y-1">
                 <label className={`block text-xs font-semibold ${isDark ? 'text-neutral-300' : 'text-slate-700'}`}>
-                  {language === 'es' ? 'Mensaje o Consulta *' : 'Message *'}
+                  {t('contactModal.messageLabel')}
                 </label>
                 <div className="relative">
                   <MessageSquare className="w-4 h-4 absolute left-3 top-3 text-neutral-400" />
@@ -311,11 +303,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) =
                     rows={4}
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
-                    placeholder={
-                      language === 'es'
-                        ? 'Describe aquí detalladamente tus dudas, solicitud de entrenamiento personalizado o soporte...'
-                        : 'Please describe your request, custom training goals, or questions...'
-                    }
+                    placeholder={t('contactModal.messagePlaceholder')}
                     className={`w-full pl-9 pr-3 py-2 rounded-xl text-xs border outline-none transition-all resize-none ${
                       isDark
                         ? 'bg-[#181824] border-[#2A2A3C] text-white focus:border-[#56A867]'
@@ -333,9 +321,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) =
               >
                 <Sparkles className="w-3.5 h-3.5 text-[#56A867] shrink-0 mt-0.5" />
                 <span>
-                  {language === 'es'
-                    ? 'Al enviar, se crea un documento en la colección \'mail\' de Firebase y SendGrid procesa el despacho del correo en tiempo real.'
-                    : 'Upon sending, a document is saved to the Firebase \'mail\' collection and SendGrid dispatches the email in real-time.'}
+                  {t('contactModal.disclaimer')}
                 </span>
               </div>
 
@@ -348,7 +334,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) =
                     isDark ? 'hover:bg-[#1E1E2C] text-neutral-400' : 'hover:bg-slate-100 text-slate-600'
                   }`}
                 >
-                  {language === 'es' ? 'Cancelar' : 'Cancel'}
+                  {t('cancel')}
                 </button>
                 <button
                   type="submit"
@@ -358,12 +344,12 @@ export const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) =
                   {loading ? (
                     <>
                       <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      <span>{language === 'es' ? 'Despachando correo...' : 'Sending email...'}</span>
+                      <span>{t('contactModal.sending')}</span>
                     </>
                   ) : (
                     <>
                       <Send className="w-3.5 h-3.5" />
-                      <span>{language === 'es' ? 'Enviar Mensaje' : 'Send Message'}</span>
+                      <span>{t('contactModal.sendBtn')}</span>
                     </>
                   )}
                 </button>

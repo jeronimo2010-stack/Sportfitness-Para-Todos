@@ -30,7 +30,7 @@ export const PlankPenanceModal: React.FC<PlankPenanceModalProps> = ({
   onClose,
   onSuccess,
 }) => {
-  const { user, setUser } = useApp();
+  const { user, setUser, t } = useApp();
   const [secondsLeft, setSecondsLeft] = useState(60);
   const [isActive, setIsActive] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
@@ -78,10 +78,10 @@ export const PlankPenanceModal: React.FC<PlankPenanceModalProps> = ({
             <ShieldAlert className="w-5 h-5 text-amber-400 animate-pulse" />
             <div>
               <h3 className="text-sm font-bold text-white font-serif uppercase tracking-wider">
-                Penitencia por Día Faltante
+                {t('plankModal.title')}
               </h3>
               <p className="text-[10px] font-mono text-amber-300">
-                1 Minuto de Tablón Isométrico (Plank)
+                {t('plankModal.subtitle')}
               </p>
             </div>
           </div>
@@ -99,7 +99,7 @@ export const PlankPenanceModal: React.FC<PlankPenanceModalProps> = ({
             <>
               <div>
                 <p className="text-xs text-[#9E9EA8] max-w-sm mx-auto">
-                  Has saltado una rutina de entre semana (Lunes a Viernes). Para recuperar tu disciplina y proteger tu racha del <strong>1% de descuento diario</strong>, completa 60 segundos continuos de tablón.
+                  {t('plankModal.desc')} <strong>{t('plankModal.discountTag')}</strong>{t('plankModal.descCont')}
                 </p>
               </div>
 
@@ -132,7 +132,7 @@ export const PlankPenanceModal: React.FC<PlankPenanceModalProps> = ({
                     00:{secondsLeft < 10 ? `0${secondsLeft}` : secondsLeft}
                   </span>
                   <span className="text-[10px] font-mono text-amber-400 uppercase tracking-widest mt-0.5">
-                    {isActive ? 'En Posición' : 'Listo para iniciar'}
+                    {isActive ? t('plankModal.inPosition') : t('plankModal.ready')}
                   </span>
                 </div>
               </div>
@@ -141,10 +141,10 @@ export const PlankPenanceModal: React.FC<PlankPenanceModalProps> = ({
               <div className="p-3 bg-[#181824] rounded-xl border border-[#242436] text-left text-xs text-neutral-300 space-y-1">
                 <div className="flex items-center gap-1.5 text-amber-400 font-bold font-mono text-[11px] uppercase">
                   <Flame className="w-3.5 h-3.5" />
-                  <span>Puntos de Postura:</span>
+                  <span>{t('plankModal.postureTitle')}</span>
                 </div>
                 <p className="text-[11px] text-[#A0A0B0]">
-                  • Codos bajo hombros • Aprieta glúteos y ombligo hacia la columna • Respira sin arquear la zona lumbar.
+                  {t('plankModal.postureCues')}
                 </p>
               </div>
 
@@ -161,12 +161,12 @@ export const PlankPenanceModal: React.FC<PlankPenanceModalProps> = ({
                   {isActive ? (
                     <>
                       <Pause className="w-4 h-4 fill-current" />
-                      <span>Pausar Tablón</span>
+                      <span>{t('plankModal.pause')}</span>
                     </>
                   ) : (
                     <>
                       <Play className="w-4 h-4 fill-current" />
-                      <span>{secondsLeft === 60 ? 'Comenzar 1 Minuto' : 'Reanudar'}</span>
+                      <span>{secondsLeft === 60 ? t('plankModal.start') : t('plankModal.resume')}</span>
                     </>
                   )}
                 </button>
@@ -174,7 +174,7 @@ export const PlankPenanceModal: React.FC<PlankPenanceModalProps> = ({
                 <button
                   onClick={handleReset}
                   className="p-2.5 rounded-xl bg-[#1C1C28] hover:bg-[#252535] text-neutral-300"
-                  title="Reiniciar contador"
+                  title={t('plankModal.resetTitle')}
                 >
                   <RotateCcw className="w-4 h-4" />
                 </button>
@@ -187,10 +187,10 @@ export const PlankPenanceModal: React.FC<PlankPenanceModalProps> = ({
                 <Award className="w-9 h-9" />
               </div>
               <h3 className="text-xl font-bold font-serif text-white">
-                ¡Penitencia de 1 Minuto Cumplida!
+                {t('plankModal.completedTitle')}
               </h3>
               <p className="text-xs text-[#9E9EA8] max-w-sm mx-auto">
-                Excelente determinación. Tu racha deportiva se ha reanudado satisfactoriamente y conservas tu descuento del <strong>1% por día acumulado</strong>.
+                {t('plankModal.completedDesc')} <strong>{t('plankModal.accumulatedDiscount')}</strong>.
               </p>
 
               <div className="pt-2">
@@ -198,7 +198,7 @@ export const PlankPenanceModal: React.FC<PlankPenanceModalProps> = ({
                   onClick={onClose}
                   className="px-6 py-2.5 rounded-xl bg-[#56A867] hover:bg-[#64B875] text-black font-mono text-xs font-bold uppercase tracking-wider shadow-[0_0_15px_rgba(86,168,103,0.3)]"
                 >
-                  Continuar al Calendario
+                  {t('plankModal.continueToCalendar')}
                 </button>
               </div>
             </div>

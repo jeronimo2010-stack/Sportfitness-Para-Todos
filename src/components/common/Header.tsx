@@ -32,6 +32,7 @@ import { EmblemLogo } from './EmblemLogo';
 import { useApp } from '../../context/AppContext';
 import { LanguageSelector } from './LanguageSelector';
 import { UserAvatar } from './UserAvatar';
+import { formatNumber } from '../../utils/localeFormatters';
 
 interface HeaderProps {
   currentScreen: ScreenId;
@@ -72,32 +73,32 @@ export const Header: React.FC<HeaderProps> = ({
 
   // Ordered modules as requested, excluding sport assistant, and database only for coach
   const modulesList: { id: ScreenId; title: string; category: string }[] = [
-    { id: 'landing', title: t('navLanding'), category: language === 'en' ? 'Public' : 'Público' },
-    { id: 'athlete-login', title: t('navAthleteLogin'), category: language === 'en' ? 'Access' : 'Acceso' },
-    { id: 'trainer-login', title: t('navTrainerLogin'), category: language === 'en' ? 'Access' : 'Acceso' },
-    { id: 'my-account', title: t('accountTitle'), category: language === 'en' ? 'Account' : 'Cuenta' },
-    { id: 'athlete-dashboard', title: t('navAthleteDashboard'), category: language === 'en' ? 'Athlete' : 'Atleta' },
-    { id: 'trainer-overview', title: t('navTrainerDashboard'), category: language === 'en' ? 'Coach' : 'Entrenador' },
+    { id: 'landing', title: t('navLanding'), category: t('header.catPublic') },
+    { id: 'athlete-login', title: t('navAthleteLogin'), category: t('header.catAccess') },
+    { id: 'trainer-login', title: t('navTrainerLogin'), category: t('header.catAccess') },
+    { id: 'my-account', title: t('accountTitle'), category: t('header.catAccount') },
+    { id: 'athlete-dashboard', title: t('navAthleteDashboard'), category: t('header.catAthlete') },
+    { id: 'trainer-overview', title: t('navTrainerDashboard'), category: t('header.catCoach') },
     // Do NOT offer workouts (routines / live-workout) to coaches
     ...(!isCoach
       ? [
-          { id: 'routines' as ScreenId, title: t('navRoutines'), category: language === 'en' ? 'Workout' : 'Entrenamiento' },
-          { id: 'live-workout' as ScreenId, title: t('navLiveWorkout'), category: language === 'en' ? 'Workout' : 'Entrenamiento' },
+          { id: 'routines' as ScreenId, title: t('navRoutines'), category: t('header.catWorkout') },
+          { id: 'live-workout' as ScreenId, title: t('navLiveWorkout'), category: t('header.catWorkout') },
         ]
       : []),
-    { id: 'calendar', title: t('navCalendar'), category: language === 'en' ? 'Schedule' : 'Agenda' },
-    { id: 'nutrition', title: t('navNutrition'), category: language === 'en' ? 'Nutrition' : 'Nutrición' },
-    { id: 'reviews', title: t('navReviews'), category: language === 'en' ? 'Community' : 'Comunidad' },
+    { id: 'calendar', title: t('navCalendar'), category: t('header.catSchedule') },
+    { id: 'nutrition', title: t('navNutrition'), category: t('header.catNutrition') },
+    { id: 'reviews', title: t('navReviews'), category: t('header.catCommunity') },
     ...(isCoach
       ? [
           {
             id: 'database' as ScreenId,
-            title: language === 'en' ? 'SQL Database' : 'Base de Datos SQL',
-            category: language === 'en' ? 'Database' : 'Base de Datos',
+            title: t('header.sqlDatabase'),
+            category: t('header.catDatabase'),
           },
         ]
       : []),
-    { id: 'settings', title: t('navSettings'), category: language === 'en' ? 'Settings' : 'Ajustes' },
+    { id: 'settings', title: t('navSettings'), category: t('header.catSettings') },
   ];
 
   const isDark = theme === 'dark';
@@ -130,7 +131,7 @@ export const Header: React.FC<HeaderProps> = ({
             className={`min-w-[40px] min-h-[40px] p-2 rounded-lg md:hidden flex items-center justify-center transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-[#56A867] focus-visible:outline-none ${
               isDark ? 'hover:bg-[#181820] text-neutral-300' : 'hover:bg-slate-100 text-slate-700'
             }`}
-            aria-label="Abrir menú de navegación lateral"
+            aria-label={t('header.openSidebar')}
           >
             <Menu className="w-5 h-5" />
           </button>
@@ -168,12 +169,12 @@ export const Header: React.FC<HeaderProps> = ({
                 ? 'bg-[#18181C] hover:bg-[#222228] border-[#2D2D35] hover:border-[#56A867]/50 text-[#E0E0E0]'
                 : 'bg-slate-100 hover:bg-slate-200 border-slate-300 text-slate-800'
             }`}
-            title={language === 'en' ? 'Select section' : 'Seleccionar sección'}
+            title={t('header.selectSection')}
             aria-expanded={showModuleSelector}
           >
             <Layers className={`w-3.5 h-3.5 shrink-0 ${isDark ? 'text-[#56A867]' : 'text-emerald-600'}`} />
             <span className="hidden md:inline font-sans text-xs opacity-75">
-              {language === 'en' ? 'Section:' : 'Sección:'}
+              {t('header.sectionLabel')}
             </span>
             <span className="font-semibold truncate max-w-[110px] sm:max-w-[180px]">
               {modulesList.find((m) => m.id === currentScreen)?.title.split('.')[1]?.trim() || currentScreen}
@@ -194,9 +195,9 @@ export const Header: React.FC<HeaderProps> = ({
                   isDark ? 'text-[#56A867]' : 'text-emerald-700 font-bold'
                 }`}
               >
-                <span>{language === 'en' ? 'Platform Navigation' : 'Arquitectura Completa'}</span>
+                <span>{t('header.platformArchitecture')}</span>
                 <span className="text-neutral-500">
-                  {modulesList.length} {language === 'en' ? 'views' : 'vistas'}
+                  {formatNumber(modulesList.length, language)} {t('header.viewsCount')}
                 </span>
               </div>
               <div className="py-1 space-y-0.5">
@@ -259,7 +260,7 @@ export const Header: React.FC<HeaderProps> = ({
               ? 'bg-[#141418] hover:bg-[#1E1E24] text-neutral-300 hover:text-white border-[#222228]'
               : 'bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 border-slate-200'
           }`}
-          aria-label="Toggle dark/light theme"
+          aria-label={t('header.toggleTheme')}
         >
           {isDark ? (
             <Sun className="w-4 h-4 text-amber-400" />
@@ -267,7 +268,7 @@ export const Header: React.FC<HeaderProps> = ({
             <Moon className="w-4 h-4 text-slate-700" />
           )}
           <span className="hidden lg:inline text-[11px] font-mono font-medium">
-            {isDark ? (language === 'en' ? 'Light' : 'Claro') : (language === 'en' ? 'Dark' : 'Oscuro')}
+            {isDark ? t('header.themeLightLabel') : t('header.themeDarkLabel')}
           </span>
         </button>
 
@@ -283,7 +284,7 @@ export const Header: React.FC<HeaderProps> = ({
                 ? 'bg-[#141418] hover:bg-[#1E1E24] text-neutral-300 hover:text-white border-[#222228]'
                 : 'bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 border-slate-200'
             }`}
-            aria-label="Abrir centro de notificaciones"
+            aria-label={t('header.openNotifications')}
             aria-expanded={showNotifications}
           >
             <Bell className="w-4 h-4" />
@@ -300,14 +301,14 @@ export const Header: React.FC<HeaderProps> = ({
             >
               <div className="flex items-center justify-between pb-2 border-b border-inherit mb-2">
                 <span className={`text-xs font-mono font-bold uppercase tracking-wider ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                  {language === 'en' ? `Notifications (${notifications.length})` : `Notificaciones (${notifications.length})`}
+                  {t('header.notificationsTitle')} ({formatNumber(notifications.length, language)})
                 </span>
                 {notifications.length > 0 && hasUnread && (
                   <button
                     onClick={markAllNotificationsRead}
                     className={`text-[10px] font-mono cursor-pointer hover:underline p-1 ${isDark ? 'text-[#56A867]' : 'text-emerald-600'}`}
                   >
-                    {language === 'en' ? 'Mark read' : 'Marcar leídas'}
+                    {t('header.markAllRead')}
                   </button>
                 )}
               </div>
@@ -316,7 +317,7 @@ export const Header: React.FC<HeaderProps> = ({
                 <div className="py-6 px-3 text-center space-y-2">
                   <BellOff className="w-6 h-6 mx-auto opacity-40 text-neutral-400" />
                   <p className={`text-xs ${isDark ? 'text-neutral-400' : 'text-slate-500'}`}>
-                    {language === 'en' ? 'No pending notifications' : 'No tienes notificaciones pendientes'}
+                    {t('header.noNotifications')}
                   </p>
                   {notificationConsent !== 'granted' && (
                     <button
@@ -326,7 +327,7 @@ export const Header: React.FC<HeaderProps> = ({
                       }}
                       className="mt-1 text-[11px] text-[#56A867] hover:underline font-mono font-medium block mx-auto cursor-pointer p-1"
                     >
-                      {language === 'en' ? '+ Enable notifications' : '+ Activar notificaciones'}
+                      {t('header.enableNotifications')}
                     </button>
                   )}
                 </div>
@@ -369,7 +370,7 @@ export const Header: React.FC<HeaderProps> = ({
                 ? 'bg-[#141418] hover:bg-[#1E1E24] border-[#222228]'
                 : 'bg-slate-100 hover:bg-slate-200 border-slate-200'
             }`}
-            aria-label="Menú de perfil de usuario"
+            aria-label={t('header.userMenuAria')}
             aria-expanded={showUserMenu}
           >
             <UserAvatar user={user} size="sm" border={false} className="w-7 h-7" />
@@ -411,7 +412,7 @@ export const Header: React.FC<HeaderProps> = ({
                   }`}
                 >
                   <User className="w-3.5 h-3.5 text-[#56A867]" />
-                  <span className="font-bold text-[#56A867]">{t('accountTitle')} & Progreso</span>
+                  <span className="font-bold text-[#56A867]">{t('header.accountAndProgress')}</span>
                 </button>
 
                 <button

@@ -92,7 +92,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
     {
       id: 'weekly-news' as ScreenId,
-      label: language === 'en' ? 'News & Streak' : 'Noticias & Racha',
+      label: t('sidebar.newsAndStreak'),
       icon: Newspaper,
     },
     {
@@ -119,7 +119,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       ? [
           {
             id: 'database' as ScreenId,
-            label: language === 'en' ? 'SQL Database' : 'Base de Datos SQL',
+            label: t('sidebar.sqlDatabase'),
             icon: Database,
             badge: 'SQL',
           },
@@ -148,13 +148,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
               isDark ? 'text-neutral-400' : 'text-slate-600'
             }`}
           >
-            {language === 'en' ? 'Sportfitness Platform' : 'Plataforma Sportfitness'}
+            {t('sidebar.platformTitle')}
           </span>
           {onClose && (
             <button
               onClick={onClose}
               className="p-1.5 rounded-lg md:hidden text-neutral-400 hover:text-white min-w-[36px] min-h-[36px] flex items-center justify-center cursor-pointer"
-              aria-label="Cerrar menú de navegación"
+              aria-label={t('sidebar.closeMenu')}
             >
               <X className="w-4 h-4" />
             </button>
@@ -231,19 +231,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {isDark ? (
               <>
                 <Sun className="w-3.5 h-3.5 text-amber-400" />
-                <span>{language === 'en' ? 'Light' : 'Claro'}</span>
+                <span>{t('header.themeLightLabel')}</span>
               </>
             ) : (
               <>
                 <Moon className="w-3.5 h-3.5 text-slate-700" />
-                <span>{language === 'en' ? 'Dark' : 'Oscuro'}</span>
+                <span>{t('header.themeDarkLabel')}</span>
               </>
             )}
           </button>
 
           <button
             onClick={() => setLanguage(language === 'es' ? 'en' : 'es')}
-            title={language === 'en' ? 'Switch to Spanish' : 'Cambiar a Inglés'}
+            title={t('sidebar.switchToLang')}
             className={`p-2 rounded-xl text-xs font-mono font-bold flex items-center justify-center gap-1.5 border transition-all ${
               isDark
                 ? 'bg-[#14141A] border-[#22222A] text-neutral-300 hover:text-white'
@@ -266,7 +266,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               if (onClose) onClose();
             }}
             className="flex items-center gap-2.5 cursor-pointer hover:opacity-80 transition-opacity"
-            title={language === 'en' ? 'View My Account & Progress' : 'Ver Mi Cuenta & Progreso'}
+            title={t('sidebar.viewMyAccount')}
           >
             <UserAvatar user={user} size="sm" border={false} className="w-8 h-8" />
             <div className="flex flex-col text-left">

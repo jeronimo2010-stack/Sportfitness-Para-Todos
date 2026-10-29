@@ -19,6 +19,8 @@ import {
 } from 'lucide-react';
 import { UserProfile, CoachDirectChatMessage } from '../../types';
 import { localDatabase } from '../../db/localDatabase';
+import { useApp } from '../../context/AppContext';
+import { formatTime } from '../../utils/localeFormatters';
 
 interface CoachAthleteChatModalProps {
   isOpen: boolean;
@@ -35,6 +37,7 @@ export const CoachAthleteChatModal: React.FC<CoachAthleteChatModalProps> = ({
   otherUser,
   initialTopic,
 }) => {
+  const { language, t } = useApp();
   const [messages, setMessages] = useState<CoachDirectChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -91,16 +94,16 @@ export const CoachAthleteChatModal: React.FC<CoachAthleteChatModalProps> = ({
 
   const quickPrompts = isCoach
     ? [
-        '¡Excelente técnica y volumen en la sesión de hoy! Sigue así.',
-        'Recuerda priorizar el descanso y la hidratación antes del siguiente bloque.',
-        'Revisé tus métricas de 1RM: aumentamos 2.5 kg en peso muerto la próxima semana.',
-        '¿Cómo sentiste la fatiga neuromuscular y el esfuerzo percibido (RPE)?',
+        t('chat.coachPrompt1'),
+        t('chat.coachPrompt2'),
+        t('chat.coachPrompt3'),
+        t('chat.coachPrompt4'),
       ]
     : [
-        '¡Hola Coach! Terminé la rutina de hoy con muy buenas sensaciones.',
-        'Coach, ¿qué ajuste me recomiendas para la fase excéntrica de sentadilla?',
-        'Acabo de registrar mi nuevo pesaje semanal con comentarios en la gráfica.',
-        'Me sentí con alta energía en los levantamientos pesados de hoy.',
+        t('chat.athletePrompt1'),
+        t('chat.athletePrompt2'),
+        t('chat.athletePrompt3'),
+        t('chat.athletePrompt4'),
       ];
 
   return (
@@ -126,7 +129,7 @@ export const CoachAthleteChatModal: React.FC<CoachAthleteChatModalProps> = ({
                       : 'bg-[#56A867]/15 border border-[#56A867]/30 text-[#56A867]'
                   }`}
                 >
-                  {otherUser.role === 'entrenador' ? 'Coach Oficial' : 'Deportista Adoptado'}
+                  {otherUser.role === 'entrenador' ? t('chat.officialCoach') : t('chat.adoptedAthlete')}
                 </span>
               </div>
               <p className="text-[11px] text-[#8E8E9E] font-mono">
@@ -147,9 +150,9 @@ export const CoachAthleteChatModal: React.FC<CoachAthleteChatModalProps> = ({
         <div className="px-4 py-2 bg-[#181826] border-b border-[#222234] flex items-center justify-between text-[11px] font-mono text-[#9E9EAE] shrink-0">
           <div className="flex items-center gap-2">
             <Shield className="w-3.5 h-3.5 text-[#56A867]" />
-            <span>Canal Seguro Directo Coach - Atleta Sportfitness</span>
+            <span>{t('chat.secureChannel')}</span>
           </div>
-          <span>Mensajes sincronizados</span>
+          <span>{t('chat.syncedMessages')}</span>
         </div>
 
         {/* Message Thread */}
@@ -159,18 +162,15 @@ export const CoachAthleteChatModal: React.FC<CoachAthleteChatModalProps> = ({
               <div className="w-12 h-12 rounded-full bg-[#56A867]/10 border border-[#56A867]/30 flex items-center justify-center text-[#56A867]">
                 <MessageSquare className="w-6 h-6" />
               </div>
-              <h4 className="text-sm font-bold text-white">Canal de Chat Activado</h4>
+              <h4 className="text-sm font-bold text-white">{t('chat.emptyTitle')}</h4>
               <p className="text-xs text-[#8E8E9E] max-w-sm">
-                Inicia la conversación para coordinar entrenamientos, ajustes en 1RM, volumen de carga y feedback técnico.
+                {t('chat.emptyDesc')}
               </p>
             </div>
           ) : (
             messages.map((msg) => {
               const isMine = msg.senderId === currentUser.id;
-              const formattedTime = new Date(msg.timestamp).toLocaleTimeString([], {
-                hour: '2-digit',
-                minute: '2-digit',
-              });
+              const formattedTime = formatTime(msg.timestamp, language);
 
               return (
                 <div
@@ -178,7 +178,7 @@ export const CoachAthleteChatModal: React.FC<CoachAthleteChatModalProps> = ({
                   className={`flex flex-col ${isMine ? 'items-end' : 'items-start'}`}
                 >
                   <div className="flex items-center gap-1.5 mb-1 text-[10px] font-mono text-[#7E7E8E]">
-                    <span className="font-semibold">{isMine ? 'Tú' : msg.senderName}</span>
+                    <span className="font-semibold">{isMine ? t('chat.you') : msg.senderName}</span>
                     <span>•</span>
                     <span>{formattedTime}</span>
                   </div>
@@ -203,7 +203,7 @@ export const CoachAthleteChatModal: React.FC<CoachAthleteChatModalProps> = ({
         <div className="px-3 py-2 bg-[#14141E] border-t border-[#222232] overflow-x-auto flex items-center gap-1.5 shrink-0 scrollbar-none">
           <span className="text-[10px] font-mono text-[#7E7E8E] shrink-0 uppercase font-bold flex items-center gap-1">
             <Sparkles className="w-3 h-3 text-[#56A867]" />
-            Rápido:
+            {t('chat.quick')}
           </span>
           {quickPrompts.map((prompt, idx) => (
             <button
@@ -230,8 +230,8 @@ export const CoachAthleteChatModal: React.FC<CoachAthleteChatModalProps> = ({
             onChange={(e) => setInputText(e.target.value)}
             placeholder={
               isCoach
-                ? `Escribe un mensaje técnico o recomendación a ${otherUser.name}...`
-                : `Escribe una duda o reporte de entrenamiento a tu Coach...`
+                ? `${t('chat.coachPlaceholder')} (${otherUser.name})`
+                : t('chat.athletePlaceholder')
             }
             className="flex-1 bg-[#101018] border border-[#28283C] text-sm text-white px-4 py-2.5 rounded-xl focus:border-[#56A867] focus:outline-none placeholder:text-[#606075]"
           />
@@ -242,7 +242,7 @@ export const CoachAthleteChatModal: React.FC<CoachAthleteChatModalProps> = ({
             className="px-4 py-2.5 rounded-xl bg-[#56A867] hover:bg-[#64B875] text-black font-bold text-xs uppercase font-mono tracking-wider flex items-center gap-1.5 transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-md"
           >
             <Send className="w-3.5 h-3.5 fill-black" />
-            <span className="hidden sm:inline">Enviar</span>
+            <span className="hidden sm:inline">{t('chat.send')}</span>
           </button>
         </form>
       </div>

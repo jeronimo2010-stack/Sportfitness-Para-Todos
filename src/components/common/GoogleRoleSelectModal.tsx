@@ -22,7 +22,7 @@ export const GoogleRoleSelectModal: React.FC<GoogleRoleSelectModalProps> = ({
   onClose,
   onSuccess,
 }) => {
-  const { language, theme } = useApp();
+  const { theme, t } = useApp();
   const isDark = theme === 'dark';
   const [selectedRole, setSelectedRole] = useState<'atleta' | 'entrenador'>('atleta');
   const [loading, setLoading] = useState(false);
@@ -30,7 +30,7 @@ export const GoogleRoleSelectModal: React.FC<GoogleRoleSelectModalProps> = ({
 
   if (!isOpen || !authUser) return null;
 
-  const displayName = authUser.displayName || authUser.email?.split('@')[0] || 'Usuario';
+  const displayName = authUser.displayName || authUser.email?.split('@')[0] || t('common.userFallback');
   const userEmail = authUser.email || '';
   const photoUrl = authUser.photoURL;
 
@@ -44,10 +44,10 @@ export const GoogleRoleSelectModal: React.FC<GoogleRoleSelectModalProps> = ({
         onSuccess(res.user);
         onClose();
       } else {
-        setErrorMessage(res.error || 'Error al completar el registro con Google.');
+        setErrorMessage(res.error || t('googleRole.errComplete'));
       }
     } catch (err: any) {
-      setErrorMessage(err?.message || 'Error de conexión al guardar tu perfil.');
+      setErrorMessage(err?.message || t('googleRole.errConnection'));
     } finally {
       setLoading(false);
     }
@@ -77,10 +77,10 @@ export const GoogleRoleSelectModal: React.FC<GoogleRoleSelectModalProps> = ({
             <div>
               <div className="flex items-center gap-1.5 text-xs text-[#56A867] font-mono font-semibold uppercase">
                 <ShieldCheck className="w-3.5 h-3.5" />
-                <span>{language === 'en' ? 'Google Account Verified' : 'Cuenta de Google Verificada'}</span>
+                <span>{t('googleRole.verified')}</span>
               </div>
               <h3 className="text-lg font-bold">
-                {language === 'en' ? `Welcome, ${displayName}!` : `¡Bienvenido, ${displayName}!`}
+                {t('googleRole.welcome').replace('{name}', displayName)}
               </h3>
               <p className={`text-xs ${isDark ? 'text-neutral-400' : 'text-slate-500'}`}>{userEmail}</p>
             </div>
@@ -100,14 +100,10 @@ export const GoogleRoleSelectModal: React.FC<GoogleRoleSelectModalProps> = ({
         <div className="p-6 space-y-5">
           <div className="space-y-1">
             <h4 className="text-sm font-bold">
-              {language === 'en'
-                ? 'Select your role on the Sportfitness Platform:'
-                : 'Selecciona cómo vas a utilizar la plataforma Sportfitness:'}
+              {t('googleRole.title')}
             </h4>
             <p className={`text-xs ${isDark ? 'text-neutral-400' : 'text-slate-500'}`}>
-              {language === 'en'
-                ? 'This customizes your profile, workout algorithm, and dashboard experience.'
-                : 'Esto calibra tu panel, algoritmo de entrenamiento y permisos de la cuenta.'}
+              {t('googleRole.subtitle')}
             </p>
           </div>
 
@@ -134,12 +130,10 @@ export const GoogleRoleSelectModal: React.FC<GoogleRoleSelectModalProps> = ({
                 </div>
                 <div>
                   <div className="font-bold text-sm">
-                    {language === 'en' ? 'Athlete / Trainee Profile' : 'Perfil de Deportista / Atleta'}
+                    {t('googleRole.athleteTitle')}
                   </div>
                   <div className={`text-xs mt-1 leading-relaxed ${isDark ? 'text-neutral-300' : 'text-slate-600'}`}>
-                    {language === 'en'
-                      ? 'Access workouts, 1RM calculator, personal progress tracking, and nutrition.'
-                      : 'Acceso completo a entrenamientos, calculadora 1RM, bitácora de progreso y nutrición.'}
+                    {t('googleRole.athleteDesc')}
                   </div>
                 </div>
               </div>
@@ -155,11 +149,9 @@ export const GoogleRoleSelectModal: React.FC<GoogleRoleSelectModalProps> = ({
               }`}
             >
               <span className="font-semibold text-amber-500">
-                {language === 'en' ? 'Coach notice: ' : 'Aviso para Coaches: '}
+                {t('googleRole.coachNoticeLabel')}
               </span>
-              {language === 'en'
-                ? 'Coach accounts require institutional registration with a unique Trainer Identification Number and cannot use Google sign-in.'
-                : 'Las cuentas de entrenador requieren registro institucional con Número de Identificación único y no utilizan inicio de sesión con Google.'}
+              {t('googleRole.coachNoticeDesc')}
             </div>
           </div>
 
@@ -176,14 +168,14 @@ export const GoogleRoleSelectModal: React.FC<GoogleRoleSelectModalProps> = ({
           >
             {loading ? (
               <span>
-                {language === 'en' ? 'Configuring Account in Firestore...' : 'Configurando Cuenta en Firestore...'}
+                {t('googleRole.configuring')}
               </span>
             ) : (
               <>
                 <span>
-                  {language === 'en'
-                    ? `Continue as ${selectedRole === 'entrenador' ? 'Coach' : 'Athlete'}`
-                    : `Continuar como ${selectedRole === 'entrenador' ? 'Entrenador' : 'Deportista'}`}
+                  {selectedRole === 'entrenador'
+                    ? t('googleRole.continueAsCoach')
+                    : t('googleRole.continueAsAthlete')}
                 </span>
                 <ArrowRight className="w-4 h-4" />
               </>
