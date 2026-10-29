@@ -353,7 +353,12 @@ export const RoutineCatalogView: React.FC<RoutineCatalogViewProps> = ({
 
             <div className="mt-6 pt-4 border-t border-[#22222E] flex flex-wrap items-center gap-3">
               <button
-                onClick={() => onNavigate('live-workout')}
+                onClick={() => {
+                  if (onSelectRoutine && filteredRoutines[0]) {
+                    onSelectRoutine(translateRoutine(filteredRoutines[0], language));
+                  }
+                  onNavigate('live-workout');
+                }}
                 className="py-3 px-6 rounded-xl bg-[#56A867] hover:bg-[#64B875] text-black font-bold text-xs transition-all shadow-[0_0_20px_rgba(86,168,103,0.3)] hover:shadow-[0_0_30px_rgba(86,168,103,0.5)] flex items-center gap-2 uppercase tracking-wider cursor-pointer"
               >
                 <Zap className="w-4 h-4 fill-black" />
@@ -688,114 +693,134 @@ export const RoutineCatalogView: React.FC<RoutineCatalogViewProps> = ({
       </ScrollReveal>
 
       {/* Routines Grid */}
-      <StaggerContainer staggerDelay={0.07} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredRoutines.map((routine) => {
-          const localizedRoutine = translateRoutine(routine, language);
-          return (
-            <StaggerItem key={routine.id} className="h-full">
+      {filteredRoutines.length === 0 ? (
+        <div className="py-16 text-center rounded-2xl bg-[#121218] border border-[#22222E] p-8 space-y-3">
+          <Dumbbell className="w-10 h-10 text-[#56A867]/50 mx-auto" />
+          <h3 className="text-base font-bold text-white font-serif">
+            {language === 'en' ? 'No routines found in this category' : 'No se encontraron rutinas en esta categoría'}
+          </h3>
+          <p className="text-xs text-[#8E8E9E]">
+            {language === 'en' ? 'Try selecting "All" or a different category' : 'Intenta seleccionando "Todos" o una categoría diferente'}
+          </p>
+          <button
+            onClick={() => { setActiveCategory('Todos'); setSearchQuery(''); }}
+            className="px-4 py-2 rounded-xl bg-[#56A867] hover:bg-[#64B875] text-black text-xs font-bold font-mono transition-colors cursor-pointer"
+          >
+            {language === 'en' ? 'View All Routines' : 'Ver Todas las Rutinas'}
+          </button>
+        </div>
+      ) : (
+        <div
+          key={`${activeCategory}-${searchQuery}`}
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fadeIn"
+        >
+          {filteredRoutines.map((routine) => {
+            const localizedRoutine = translateRoutine(routine, language);
+            return (
               <div
-                className="rounded-2xl bg-[#121218] border border-[#22222E] hover:border-[#56A867]/40 transition-all overflow-hidden flex flex-col justify-between group h-full"
+                key={routine.id}
+                className="rounded-2xl bg-[#121218] border border-[#22222E] hover:border-[#56A867]/40 transition-all overflow-hidden flex flex-col justify-between group h-full shadow-lg"
               >
-              {/* Cover Image & Badges */}
-              <div className="relative h-48 w-full overflow-hidden">
-                <img
-                  src={localizedRoutine.coverImage || heroImg}
-                  alt={localizedRoutine.title}
-                  referrerPolicy="no-referrer"
-                  onError={(e) => {
-                    const target = e.currentTarget;
-                    if (target.src !== heroImg) {
-                      target.src = heroImg;
-                    }
-                  }}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 opacity-60"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-[#121218] via-[#121218]/40 to-transparent" />
+                {/* Cover Image & Badges */}
+                <div className="relative h-48 w-full overflow-hidden">
+                  <img
+                    src={localizedRoutine.coverImage || heroImg}
+                    alt={localizedRoutine.title}
+                    referrerPolicy="no-referrer"
+                    onError={(e) => {
+                      const target = e.currentTarget;
+                      if (target.src !== heroImg) {
+                        target.src = heroImg;
+                      }
+                    }}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 opacity-60"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#121218] via-[#121218]/40 to-transparent" />
 
-                <div className="absolute top-3 left-3 flex gap-2">
-                  <span className="px-2.5 py-1 rounded-full bg-black/80 backdrop-blur-md text-[#56A867] text-[10px] font-mono font-bold uppercase border border-[#56A867]/30">
-                    {translateCategory(localizedRoutine.category, language)}
-                  </span>
-                  <span className="px-2.5 py-1 rounded-full bg-[#181824]/90 text-white text-[10px] font-mono">
-                    {localizedRoutine.level}
-                  </span>
-                </div>
-
-                <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-xs font-mono text-[#E0E0E0]">
-                  <span className="flex items-center gap-1">
-                    <Clock className="w-3.5 h-3.5 text-[#56A867]" />
-                    {localizedRoutine.durationMinutes} min
-                  </span>
-                  <span className="text-[#56A867] font-bold">
-                    {localizedRoutine.intensityRpe}
-                  </span>
-                </div>
-              </div>
-
-              {/* Content Body */}
-              <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <h3 className="text-lg font-serif font-bold text-white group-hover:text-[#56A867] transition-colors leading-snug">
-                      {localizedRoutine.title}
-                    </h3>
-                    <span className="text-[11px] font-mono text-[#56A867] whitespace-nowrap font-bold">
-                      {language === 'en' ? 'Vol:' : 'Vol:'} {localizedRoutine.targetVolumeKg.toLocaleString()}kg
+                  <div className="absolute top-3 left-3 flex gap-2">
+                    <span className="px-2.5 py-1 rounded-full bg-black/80 backdrop-blur-md text-[#56A867] text-[10px] font-mono font-bold uppercase border border-[#56A867]/30">
+                      {translateCategory(localizedRoutine.category, language)}
+                    </span>
+                    <span className="px-2.5 py-1 rounded-full bg-[#181824]/90 text-white text-[10px] font-mono">
+                      {localizedRoutine.level}
                     </span>
                   </div>
-                  <p className="text-xs text-[#9E9EA8] leading-relaxed line-clamp-2">
-                    {localizedRoutine.description}
-                  </p>
 
-                  {/* Exercises Preview with Calibrated Weights */}
-                  {localizedRoutine.exercises.length > 0 && (
-                    <div className="pt-2 space-y-1.5 border-t border-[#1C1C26]">
-                      <div className="flex items-center justify-between text-[10px] font-mono uppercase text-[#707080]">
-                        <span>{language === 'en' ? 'Key exercises' : 'Ejercicios clave'} ({localizedRoutine.exercises.length}):</span>
-                        <span className="text-[#56A867]">{language === 'en' ? 'Scaled load' : 'Carga adaptada'}</span>
-                      </div>
-                      <div className="flex flex-wrap gap-1.5 mt-1">
-                        {localizedRoutine.exercises.map((ex, i) => (
-                          <span
-                            key={i}
-                            className="px-2 py-0.5 rounded bg-[#181822] text-[#B0B0C0] text-[10px] font-mono border border-[#242432] flex items-center gap-1.5"
-                          >
-                            <span>{translateExerciseName(ex.name, language)}</span>
-                            <strong className="text-[#56A867]">@{ex.targetWeightKg}kg</strong>
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                  <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-xs font-mono text-[#E0E0E0]">
+                    <span className="flex items-center gap-1">
+                      <Clock className="w-3.5 h-3.5 text-[#56A867]" />
+                      {localizedRoutine.durationMinutes} min
+                    </span>
+                    <span className="text-[#56A867] font-bold">
+                      {localizedRoutine.intensityRpe}
+                    </span>
+                  </div>
                 </div>
 
-                {/* Action Buttons */}
-                <div className="pt-4 border-t border-[#1E1E28] flex items-center gap-2">
-                  <button
-                    onClick={() => {
-                      if (onSelectRoutine) onSelectRoutine(localizedRoutine);
-                      onNavigate('live-workout');
-                    }}
-                    className="flex-1 py-2.5 px-4 rounded-xl bg-[#56A867] hover:bg-[#64B875] text-black font-bold text-xs transition-all shadow-[0_0_15px_rgba(86,168,103,0.2)] flex items-center justify-center gap-1.5"
-                  >
-                    <Zap className="w-3.5 h-3.5 fill-black" />
-                    <span>{language === 'en' ? 'Start Routine' : 'Iniciar Rutina'}</span>
-                  </button>
+                {/* Content Body */}
+                <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <h3 className="text-lg font-serif font-bold text-white group-hover:text-[#56A867] transition-colors leading-snug">
+                        {localizedRoutine.title}
+                      </h3>
+                      <span className="text-[11px] font-mono text-[#56A867] whitespace-nowrap font-bold">
+                        {language === 'en' ? 'Vol:' : 'Vol:'} {localizedRoutine.targetVolumeKg.toLocaleString()}kg
+                      </span>
+                    </div>
+                    <p className="text-xs text-[#9E9EA8] leading-relaxed line-clamp-2">
+                      {localizedRoutine.description}
+                    </p>
 
-                  <button
-                    onClick={() => handleAssignRoutine(localizedRoutine.title)}
-                    className="py-2.5 px-3 rounded-xl bg-[#1A1A24] hover:bg-[#242432] text-[#A0A0B0] hover:text-white text-xs border border-[#282836] transition-colors"
-                    title={language === 'en' ? 'Assign to calendar' : 'Asignar al calendario'}
-                  >
-                    {language === 'en' ? 'Assign' : 'Asignar'}
-                  </button>
+                    {/* Exercises Preview with Calibrated Weights */}
+                    {localizedRoutine.exercises.length > 0 && (
+                      <div className="pt-2 space-y-1.5 border-t border-[#1C1C26]">
+                        <div className="flex items-center justify-between text-[10px] font-mono uppercase text-[#707080]">
+                          <span>{language === 'en' ? 'Key exercises' : 'Ejercicios clave'} ({localizedRoutine.exercises.length}):</span>
+                          <span className="text-[#56A867]">{language === 'en' ? 'Scaled load' : 'Carga adaptada'}</span>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5 mt-1">
+                          {localizedRoutine.exercises.map((ex, i) => (
+                            <span
+                              key={i}
+                              className="px-2 py-0.5 rounded bg-[#181822] text-[#B0B0C0] text-[10px] font-mono border border-[#242432] flex items-center gap-1.5"
+                            >
+                              <span>{translateExerciseName(ex.name, language)}</span>
+                              <strong className="text-[#56A867]">@{ex.targetWeightKg}kg</strong>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="pt-4 border-t border-[#1E1E28] flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        if (onSelectRoutine) onSelectRoutine(localizedRoutine);
+                        onNavigate('live-workout');
+                      }}
+                      className="flex-1 py-2.5 px-4 rounded-xl bg-[#56A867] hover:bg-[#64B875] text-black font-bold text-xs transition-all shadow-[0_0_15px_rgba(86,168,103,0.2)] flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <Zap className="w-3.5 h-3.5 fill-black" />
+                      <span>{language === 'en' ? 'Start Routine' : 'Iniciar Rutina'}</span>
+                    </button>
+
+                    <button
+                      onClick={() => handleAssignRoutine(localizedRoutine.title)}
+                      className="py-2.5 px-3 rounded-xl bg-[#1A1A24] hover:bg-[#242432] text-[#A0A0B0] hover:text-white text-xs border border-[#282836] transition-colors cursor-pointer"
+                      title={language === 'en' ? 'Assign to calendar' : 'Asignar al calendario'}
+                    >
+                      {language === 'en' ? 'Assign' : 'Asignar'}
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-            </StaggerItem>
-          );
-        })}
-      </StaggerContainer>
+            );
+          })}
+        </div>
+      )}
 
       {/* Modal: Create Routine */}
       {showCreateModal && (

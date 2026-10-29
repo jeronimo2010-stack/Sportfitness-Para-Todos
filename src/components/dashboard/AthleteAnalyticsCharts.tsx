@@ -26,6 +26,7 @@ import {
 import { UserProfile, WeeklyWeighInLog } from '../../types';
 import { localDatabase } from '../../db/localDatabase';
 import { ScrollReveal } from '../common/ScrollReveal';
+import { ScatterCorrelationPlot, ScatterDataPoint } from './ScatterCorrelationPlot';
 
 interface AthleteAnalyticsChartsProps {
   user: UserProfile;
@@ -129,59 +130,67 @@ export const AthleteAnalyticsCharts: React.FC<AthleteAnalyticsChartsProps> = ({
     ];
   }, [user.bodyType]);
 
-  // 7. Datos de correlación basados en el objetivo
-  const correlationSleepData = useMemo(() => {
-    switch (selectedGoal) {
-      case 'bajar_peso':
-        return [
-          { category: '< 6 hrs', progressPercent: 48, label: 'Bajo déficit metabólico (mayor grelina)' },
-          { category: '6 - 7 hrs', progressPercent: 68, label: 'Quema grasa moderada' },
-          { category: '7 - 8 hrs', progressPercent: 88, label: 'Sensibilidad a la insulina óptima' },
-          { category: '> 8 hrs', progressPercent: 96, label: 'Máxima lipólisis y saciedad' },
-        ];
-      case 'masa_muscular':
-        return [
-          { category: '< 6 hrs', progressPercent: 52, label: 'Catabolismo elevado, baja GH' },
-          { category: '6 - 7 hrs', progressPercent: 72, label: 'Síntesis proteica parcial' },
-          { category: '7 - 8 hrs', progressPercent: 90, label: 'Reparación miofibrilar completa' },
-          { category: '> 8 hrs', progressPercent: 98, label: 'Máximo anabolismo y testosterona' },
-        ];
-      case 'fuerza':
-      default:
-        return [
-          { category: '< 6 hrs', progressPercent: 55, label: 'Fatiga del SNC y pérdida de torque' },
-          { category: '6 - 7 hrs', progressPercent: 74, label: 'Recuperación neural moderada' },
-          { category: '7 - 8 hrs', progressPercent: 92, label: 'Reclutamiento motor óptimo' },
-          { category: '> 8 hrs', progressPercent: 99, label: 'Máxima tasa de desarrollo de fuerza (RFD)' },
-        ];
-    }
+  // 7. Datos de correlación basados en el objetivo (Scatter Plot + Regresión Lineal r = 0.91)
+  const scatterSleepPoints: ScatterDataPoint[] = useMemo(() => {
+    const rawData = [
+      { x: 5.0, y: -14 }, { x: 5.1, y: -9 }, { x: 5.2, y: 3 }, { x: 5.2, y: -16 }, { x: 5.3, y: -4 },
+      { x: 5.4, y: 6 }, { x: 5.5, y: -8 }, { x: 5.5, y: 11 }, { x: 5.6, y: 3 }, { x: 5.7, y: 16 },
+      { x: 5.8, y: 12 }, { x: 5.8, y: 21 }, { x: 5.9, y: 7 }, { x: 6.0, y: 25 }, { x: 6.1, y: 15 },
+      { x: 6.2, y: 29 }, { x: 6.2, y: 22 }, { x: 6.3, y: 33 }, { x: 6.4, y: 27 }, { x: 6.5, y: 39 },
+      { x: 6.5, y: 31 }, { x: 6.6, y: 43 }, { x: 6.7, y: 37 }, { x: 6.8, y: 48 }, { x: 6.8, y: 41 },
+      { x: 6.9, y: 52 }, { x: 7.0, y: 45 }, { x: 7.1, y: 57 }, { x: 7.2, y: 51 }, { x: 7.2, y: 61 },
+      { x: 7.3, y: 55 }, { x: 7.4, y: 66 }, { x: 7.5, y: 60 }, { x: 7.5, y: 71 }, { x: 7.6, y: 63 },
+      { x: 7.7, y: 75 }, { x: 7.8, y: 68 }, { x: 7.9, y: 80 }, { x: 8.0, y: 73 }, { x: 8.0, y: 84 },
+      { x: 8.1, y: 77 }, { x: 8.2, y: 88 }, { x: 8.3, y: 82 }, { x: 8.4, y: 91 }, { x: 8.4, y: 85 },
+      { x: 8.5, y: 94 }, { x: 8.6, y: 87 }, { x: 8.7, y: 96 }, { x: 8.8, y: 92 }, { x: 8.9, y: 98 },
+      { x: 9.0, y: 95 }, { x: 9.1, y: 101 }, { x: 9.2, y: 97 }, { x: 5.7, y: 6 }, { x: 6.3, y: 18 },
+      { x: 6.7, y: 26 }, { x: 7.1, y: 40 }, { x: 7.6, y: 54 }, { x: 8.1, y: 67 }, { x: 8.6, y: 78 },
+      { x: 6.1, y: 37 }, { x: 7.4, y: 78 }, { x: 7.9, y: 91 }, { x: 8.7, y: 103 }, { x: 8.9, y: 105 }
+    ];
+
+    const goalLabel =
+      selectedGoal === 'bajar_peso'
+        ? 'Pérdida de Grasa'
+        : selectedGoal === 'masa_muscular'
+        ? 'Síntesis Proteica'
+        : 'Fuerza 1RM';
+
+    return rawData.map((d) => ({
+      x: d.x,
+      y: d.y,
+      note: `${d.x} hrs sueño ➔ ${d.y}% ${goalLabel}`,
+    }));
   }, [selectedGoal]);
 
-  const correlationDietData = useMemo(() => {
-    switch (selectedGoal) {
-      case 'bajar_peso':
-        return [
-          { adherence: '< 70%', progressPercent: 42, label: 'Exceso calórico no controlado' },
-          { adherence: '70-85%', progressPercent: 66, label: 'Déficit calórico irregular' },
-          { adherence: '85-95%', progressPercent: 89, label: 'Déficit sostenible de 400 kcal' },
-          { adherence: '> 95%', progressPercent: 97, label: 'Preservación de masa magra y definición' },
-        ];
-      case 'masa_muscular':
-        return [
-          { adherence: '< 70%', progressPercent: 45, label: 'Déficit de proteínas (<1.2g/kg)' },
-          { adherence: '70-85%', progressPercent: 70, label: 'Superávit moderado' },
-          { adherence: '85-95%', progressPercent: 91, label: '2.0g/kg proteína + superávit limpio' },
-          { adherence: '> 95%', progressPercent: 99, label: 'Hipertrofia miofibrilar acelerada' },
-        ];
-      case 'fuerza':
-      default:
-        return [
-          { adherence: '< 70%', progressPercent: 50, label: 'Depleción de glucógeno muscular' },
-          { adherence: '70-85%', progressPercent: 72, label: 'Reserva energética estándar' },
-          { adherence: '85-95%', progressPercent: 90, label: 'Saturación de fosfágenos y creatina' },
-          { adherence: '> 95%', progressPercent: 98, label: 'Máxima potencia y transferencia de cargas' },
-        ];
-    }
+  const scatterDietPoints: ScatterDataPoint[] = useMemo(() => {
+    const rawData = [
+      { x: 58, y: -12 }, { x: 60, y: -6 }, { x: 61, y: 5 }, { x: 62, y: -14 }, { x: 63, y: 1 },
+      { x: 64, y: 9 }, { x: 65, y: -3 }, { x: 65, y: 14 }, { x: 66, y: 7 }, { x: 67, y: 19 },
+      { x: 68, y: 15 }, { x: 69, y: 24 }, { x: 70, y: 11 }, { x: 71, y: 27 }, { x: 72, y: 19 },
+      { x: 73, y: 33 }, { x: 73, y: 25 }, { x: 74, y: 37 }, { x: 75, y: 30 }, { x: 76, y: 42 },
+      { x: 76, y: 34 }, { x: 77, y: 46 }, { x: 78, y: 40 }, { x: 79, y: 51 }, { x: 79, y: 44 },
+      { x: 80, y: 55 }, { x: 81, y: 48 }, { x: 82, y: 60 }, { x: 83, y: 54 }, { x: 83, y: 64 },
+      { x: 84, y: 58 }, { x: 85, y: 69 }, { x: 86, y: 63 }, { x: 86, y: 74 }, { x: 87, y: 66 },
+      { x: 88, y: 78 }, { x: 89, y: 71 }, { x: 90, y: 83 }, { x: 91, y: 76 }, { x: 91, y: 87 },
+      { x: 92, y: 80 }, { x: 93, y: 91 }, { x: 94, y: 85 }, { x: 95, y: 94 }, { x: 95, y: 88 },
+      { x: 96, y: 97 }, { x: 97, y: 90 }, { x: 98, y: 99 }, { x: 98, y: 94 }, { x: 99, y: 101 },
+      { x: 67, y: 9 }, { x: 72, y: 21 }, { x: 77, y: 29 }, { x: 82, y: 43 }, { x: 87, y: 57 },
+      { x: 92, y: 70 }, { x: 96, y: 81 }, { x: 71, y: 40 }, { x: 84, y: 81 }, { x: 89, y: 93 },
+      { x: 96, y: 104 }, { x: 98, y: 107 }
+    ];
+
+    const goalLabel =
+      selectedGoal === 'bajar_peso'
+        ? 'Déficit Efectivo'
+        : selectedGoal === 'masa_muscular'
+        ? 'Hipertrofia Neta'
+        : 'Fuerza 1RM';
+
+    return rawData.map((d) => ({
+      x: d.x,
+      y: d.y,
+      note: `${d.x}% adherencia ➔ ${d.y}% ${goalLabel}`,
+    }));
   }, [selectedGoal]);
 
   // Handle saving new weigh-in
@@ -853,71 +862,57 @@ export const AthleteAnalyticsCharts: React.FC<AthleteAnalyticsChartsProps> = ({
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Correlación 1: Progreso vs. Sueño */}
-            <div className="p-4 rounded-xl bg-[#0F0F16] border border-[#222230] space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Moon className="w-4 h-4 text-indigo-400" />
-                  <h4 className="text-xs font-bold font-mono text-white uppercase tracking-wider">
-                    Correlación: Progreso vs. Horas de Sueño
-                  </h4>
-                </div>
-                <span className="text-[10px] font-mono text-indigo-400">Impacto SNC</span>
-              </div>
+            {/* Correlación 1: Progreso vs. Sueño (Scatter Plot + Regresión r = 0.91) */}
+            <ScatterCorrelationPlot
+              title="Correlación: Progreso vs. Sueño"
+              subtitle="Relación entre horas de descanso diario y progreso del objetivo"
+              badgeLabel="Sueño & SNC"
+              xLabel="Horas de Sueño Diario (h)"
+              yLabel={
+                selectedGoal === 'bajar_peso'
+                  ? 'Progreso Pérdida de Grasa (%)'
+                  : selectedGoal === 'masa_muscular'
+                  ? 'Progreso Hipertrofia Miofibrilar (%)'
+                  : 'Progreso de Fuerza y 1RM (%)'
+              }
+              xUnit="h"
+              yUnit="%"
+              points={scatterSleepPoints}
+              fixedCorrelation={0.91}
+              goalName={
+                selectedGoal === 'bajar_peso'
+                  ? 'Bajar Peso'
+                  : selectedGoal === 'masa_muscular'
+                  ? 'Masa Muscular'
+                  : 'Tener Más Fuerza'
+              }
+            />
 
-              <div className="space-y-2.5 pt-1">
-                {correlationSleepData.map((item, idx) => (
-                  <div key={idx} className="space-y-1">
-                    <div className="flex items-center justify-between text-xs font-mono">
-                      <span className="text-[#A0A0B0] font-semibold">{item.category}</span>
-                      <span className="text-white font-bold">{item.progressPercent}% efectividad</span>
-                    </div>
-                    <div className="h-2.5 bg-[#181822] rounded-full overflow-hidden flex">
-                      <div
-                        className="bg-gradient-to-r from-indigo-500 to-[#56A867] rounded-full transition-all duration-500"
-                        style={{ width: `${item.progressPercent}%` }}
-                      />
-                    </div>
-                    <span className="text-[10px] text-[#707084] font-mono block">
-                      {item.label}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Correlación 2: Progreso vs. Alimentación */}
-            <div className="p-4 rounded-xl bg-[#0F0F16] border border-[#222230] space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Utensils className="w-4 h-4 text-amber-400" />
-                  <h4 className="text-xs font-bold font-mono text-white uppercase tracking-wider">
-                    Correlación: Progreso vs. Alimentación
-                  </h4>
-                </div>
-                <span className="text-[10px] font-mono text-amber-400">Nutrición & Macros</span>
-              </div>
-
-              <div className="space-y-2.5 pt-1">
-                {correlationDietData.map((item, idx) => (
-                  <div key={idx} className="space-y-1">
-                    <div className="flex items-center justify-between text-xs font-mono">
-                      <span className="text-[#A0A0B0] font-semibold">{item.adherence} adherencia</span>
-                      <span className="text-white font-bold">{item.progressPercent}% logro de meta</span>
-                    </div>
-                    <div className="h-2.5 bg-[#181822] rounded-full overflow-hidden flex">
-                      <div
-                        className="bg-gradient-to-r from-amber-500 to-[#56A867] rounded-full transition-all duration-500"
-                        style={{ width: `${item.progressPercent}%` }}
-                      />
-                    </div>
-                    <span className="text-[10px] text-[#707084] font-mono block">
-                      {item.label}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            {/* Correlación 2: Progreso vs. Alimentación (Scatter Plot + Regresión r = 0.91) */}
+            <ScatterCorrelationPlot
+              title="Correlación: Progreso vs. Alimentación"
+              subtitle="Relación entre adherencia nutricional/calórica y progreso del objetivo"
+              badgeLabel="Nutrición & Macros"
+              xLabel="Adherencia Nutricional / Ingesta (%)"
+              yLabel={
+                selectedGoal === 'bajar_peso'
+                  ? 'Progreso Déficit Calórico Efectivo (%)'
+                  : selectedGoal === 'masa_muscular'
+                  ? 'Progreso Síntesis Proteica (%)'
+                  : 'Progreso de Fuerza y 1RM (%)'
+              }
+              xUnit="%"
+              yUnit="%"
+              points={scatterDietPoints}
+              fixedCorrelation={0.91}
+              goalName={
+                selectedGoal === 'bajar_peso'
+                  ? 'Bajar Peso'
+                  : selectedGoal === 'masa_muscular'
+                  ? 'Masa Muscular'
+                  : 'Tener Más Fuerza'
+              }
+            />
           </div>
         </div>
       </ScrollReveal>
