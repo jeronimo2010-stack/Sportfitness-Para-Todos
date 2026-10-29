@@ -31,7 +31,6 @@ import {
   getExerciseLoadForUser,
   getCalibratedExerciseItem,
 } from '../../utils/biomechanicalWeights';
-import { ScrollReveal } from '../common/ScrollReveal';
 
 interface LiveWorkoutViewProps {
   onNavigate: (screen: ScreenId) => void;
@@ -125,12 +124,12 @@ export const LiveWorkoutView: React.FC<LiveWorkoutViewProps> = ({
   }, [selectedRoutine?.id]);
 
   // Active workout timer
-  const [elapsedSeconds, setElapsedSeconds] = useState(1458); // ~24 min
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [isWorkoutActive, setIsWorkoutActive] = useState(true);
 
   // Rest timer
-  const [restSeconds, setRestSeconds] = useState(84); // 01:24
-  const [isResting, setIsResting] = useState(true);
+  const [restSeconds, setRestSeconds] = useState(90);
+  const [isResting, setIsResting] = useState(false);
 
   const fallbackExercise: ExerciseItem = {
     id: 'ex-default-squat',
@@ -154,60 +153,17 @@ export const LiveWorkoutView: React.FC<LiveWorkoutViewProps> = ({
   }, [currentExercise, currentUser]);
 
   // Load registration form state initialized to the user's calibrated weight
-  const [currentSetNumber, setCurrentSetNumber] = useState(3);
+  const [currentSetNumber, setCurrentSetNumber] = useState(1);
   const [weightKg, setWeightKg] = useState<number>(targetLoadKg);
   const [repsCompleted, setRepsCompleted] = useState(8);
-  const [rpe, setRpe] = useState(8.5);
+  const [rpe, setRpe] = useState(8.0);
 
-  // Completed sets history dynamically initialized from user's calibrated profile
-  const [completedSets, setCompletedSets] = useState<WorkoutSet[]>(() => {
-    const warmupKg = Math.max(15, Math.round((targetLoadKg * 0.92) / 2.5) * 2.5);
-    return [
-      {
-        setNumber: 1,
-        targetReps: '8 reps',
-        weightKg: warmupKg,
-        repsCompleted: 8,
-        rpe: 7.5,
-        completed: true,
-        timestamp: '18:04',
-      },
-      {
-        setNumber: 2,
-        targetReps: '8 reps',
-        weightKg: targetLoadKg,
-        repsCompleted: 8,
-        rpe: 8.0,
-        completed: true,
-        timestamp: '18:11',
-      },
-    ];
-  });
+  // Completed sets history starts empty until athlete logs real sets (prevents fake invented tonnage)
+  const [completedSets, setCompletedSets] = useState<WorkoutSet[]>([]);
 
-  // When active exercise or user changes, synchronize the working weight and completed sets history
+  // When active exercise or user changes, synchronize the working weight
   useEffect(() => {
     setWeightKg(targetLoadKg);
-    const warmupKg = Math.max(15, Math.round((targetLoadKg * 0.92) / 2.5) * 2.5);
-    setCompletedSets([
-      {
-        setNumber: 1,
-        targetReps: '8 reps',
-        weightKg: warmupKg,
-        repsCompleted: 8,
-        rpe: 7.5,
-        completed: true,
-        timestamp: '18:04',
-      },
-      {
-        setNumber: 2,
-        targetReps: '8 reps',
-        weightKg: targetLoadKg,
-        repsCompleted: 8,
-        rpe: 8.0,
-        completed: true,
-        timestamp: '18:11',
-      },
-    ]);
   }, [targetLoadKg, currentUser.id, activeExerciseIndex]);
 
   const [showFinishModal, setShowFinishModal] = useState(false);
@@ -266,7 +222,7 @@ export const LiveWorkoutView: React.FC<LiveWorkoutViewProps> = ({
   const handleFinishWorkout = async () => {
     setIsWorkoutActive(false);
     const duration = Math.max(1, Math.round(elapsedSeconds / 60));
-    const tonnage = totalTonnageRecorded || Math.round(weightKg * 10);
+    const tonnage = totalTonnageRecorded;
 
     try {
       if (currentUser.id) {
@@ -300,7 +256,7 @@ export const LiveWorkoutView: React.FC<LiveWorkoutViewProps> = ({
   return (
     <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto text-left">
       {/* Top Banner with live stats and active account biometrics */}
-      <ScrollReveal direction="down" duration={0.4}>
+      <div className="animate-fadeIn">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-2xl bg-[#121218] border border-[#20202A]">
           <div className="flex items-center gap-3">
             <div className="w-3 h-3 rounded-full bg-[#56A867] animate-ping" />
@@ -346,10 +302,10 @@ export const LiveWorkoutView: React.FC<LiveWorkoutViewProps> = ({
             </button>
           </div>
         </div>
-      </ScrollReveal>
+      </div>
 
       {/* 3-Column Athletic Grid */}
-      <ScrollReveal direction="up" delay={0.1} duration={0.4}>
+      <div className="animate-fadeIn">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left 3 cols: Exercise Progress List */}
         <div className="lg:col-span-3 p-5 rounded-2xl bg-[#121218] border border-[#20202A] space-y-4 flex flex-col justify-between">
@@ -649,7 +605,7 @@ export const LiveWorkoutView: React.FC<LiveWorkoutViewProps> = ({
           </div>
         </div>
       </div>
-    </ScrollReveal>
+    </div>
 
       {/* Workout Completion Summary Modal */}
       {showFinishModal && (

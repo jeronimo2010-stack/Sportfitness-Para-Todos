@@ -461,7 +461,12 @@ export const RoutineCatalogView: React.FC<RoutineCatalogViewProps> = ({
 
             <div className="flex items-center gap-2 shrink-0">
               <button
-                onClick={() => onNavigate('live-workout')}
+                onClick={() => {
+                  if (onSelectRoutine && filteredRoutines[0]) {
+                    onSelectRoutine(translateRoutine(filteredRoutines[0], language));
+                  }
+                  onNavigate('live-workout');
+                }}
                 className="py-2.5 px-4 rounded-xl bg-[#56A867] hover:bg-[#64B875] text-black text-xs font-bold font-mono uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-[0_0_15px_rgba(86,168,103,0.25)] cursor-pointer"
               >
                 <Dumbbell className="w-3.5 h-3.5" />
